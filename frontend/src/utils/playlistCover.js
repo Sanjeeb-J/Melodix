@@ -41,3 +41,10 @@ export const getPlaylistImage = (playlistId, index = 0) => {
   // Using Unsplash Source for random images
   return `https://source.unsplash.com/400x400/?${topic},dark`;
 };
+
+export const getPlaylistThumbnail = (playlist) => {
+  if (playlist?.songs?.length > 0 && playlist.songs[0].thumbnail) {
+    return playlist.songs[0].thumbnail;
+  }
+  return null;
+};

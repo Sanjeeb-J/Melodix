@@ -624,11 +624,22 @@ function Dashboard() {
                       onClick={() => handlePlaylistSelect(p)}
                       className="group bg-zinc-900/30 p-4 rounded-3xl hover:bg-zinc-800 transition-all cursor-pointer"
                     >
-                      <div
-                        className={`aspect-square rounded-2xl overflow-hidden mb-4 bg-gradient-to-br ${getPlaylistCover(
-                          p._id
-                        )}`}
-                      ></div>
+                      <div className="aspect-square rounded-2xl overflow-hidden">
+                        {p.songs?.length > 0 ? (
+                          <img
+                            src={p.songs[0].thumbnail}
+                            alt={p.name}
+                            className="w-full h-full object-cover"
+                          />
+                        ) : (
+                          <div
+                            className={`w-full h-full bg-gradient-to-br ${getPlaylistCover(
+                              p._id
+                            )}`}
+                          />
+                        )}
+                      </div>
+
                       <h4 className="font-black truncate text-lg">{p.name}</h4>
                       <p className="text-xs text-zinc-500 font-bold uppercase">
                         {p.songs?.length || 0} Tracks
@@ -658,11 +669,22 @@ function Dashboard() {
                     onClick={() => handlePlaylistSelect(p)}
                     className="bg-zinc-900/30 p-4 rounded-3xl hover:bg-zinc-800 transition-all cursor-pointer group"
                   >
-                    <div
-                      className={`aspect-square rounded-2xl overflow-hidden mb-4 bg-gradient-to-br ${getPlaylistCover(
-                        p._id
-                      )}`}
-                    ></div>
+                    <div className="aspect-square rounded-2xl overflow-hidden">
+                      {p.songs?.length > 0 ? (
+                        <img
+                          src={p.songs[0].thumbnail}
+                          alt={p.name}
+                          className="w-full h-full object-cover"
+                        />
+                      ) : (
+                        <div
+                          className={`w-full h-full bg-gradient-to-br ${getPlaylistCover(
+                            p._id
+                          )}`}
+                        />
+                      )}
+                    </div>
+
                     <h4 className="font-black truncate mb-2">{p.name}</h4>
                     <span className="text-xs text-zinc-600 font-black uppercase">
                       {p.songs?.length || 0} items
@@ -677,11 +699,25 @@ function Dashboard() {
           {currentView === "playlist" && selectedPlaylist && (
             <div className="space-y-16 pb-32">
               <div className="flex flex-col md:flex-row items-center md:items-end space-y-8 md:space-y-0 md:space-x-12">
-                <div
-                  className={`w-48 h-48 md:w-80 md:h-80 rounded-3xl bg-gradient-to-br ${getPlaylistCover(
-                    selectedPlaylist._id
-                  )} shadow-2xl`}
-                ></div>
+                <div className="w-48 h-48 md:w-80 md:h-80 rounded-3xl overflow-hidden shadow-2xl relative">
+                  {selectedPlaylist.songs?.length > 0 ? (
+                    <img
+                      src={selectedPlaylist.songs[0].thumbnail}
+                      alt={selectedPlaylist.name}
+                      className="w-full h-full object-cover"
+                    />
+                  ) : (
+                    <div
+                      className={`w-full h-full bg-gradient-to-br ${getPlaylistCover(
+                        selectedPlaylist._id
+                      )}`}
+                    />
+                  )}
+
+                  {/* optional dark overlay for better text contrast */}
+                  <div className="absolute inset-0 bg-black/20" />
+                </div>
+
                 <div className="flex-1 text-center md:text-left">
                   <span className="bg-indigo-600 text-white text-xs font-black px-3 py-1 rounded-lg">
                     Private Mix

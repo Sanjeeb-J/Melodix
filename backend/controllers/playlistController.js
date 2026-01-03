@@ -90,40 +90,16 @@ const updatePlaylistName = async (req, res) => {
   }
 };
 
-// ADD SONG TO PLAYLIST
-const addSongToPlaylist = async (req, res) => {
-  try {
-    const playlist = await Playlist.findById(req.params.id);
-
-    if (!playlist) {
-      return res.status(404).json({ message: "Playlist not found" });
-    }
-
-    playlist.songs.push({
-      name: req.body.name,
-      artist: req.body.artist,
-      album: req.body.album,
-      duration: req.body.duration,
-      youtubeLink: req.body.youtubeLink,
-      youtubeId: req.body.youtubeId,
-      thumbnail:
-        req.body.thumbnail ||
-        `https://i.ytimg.com/vi/${req.body.youtubeId}/hqdefault.jpg`,
-    });
-
-    await playlist.save();
-    res.json({ playlist });
-  } catch (err) {
-    console.error(err);
-    res.status(500).json({ message: "Failed to add song" });
-  }
-};
-
 // ADD SONG FROM YOUTUBE SEARCH RESULT
 const addSongFromYouTube = async (req, res) => {
   try {
     const { playlistId } = req.params;
-    const { title, artist, videoId, thumbnail } = req.body;
+    const { name, artist, album, duration, youtubeId, youtubeLink, thumbnail } =
+      req.body;
+
+    if (!youtubeId || !youtubeLink || !name) {
+      return res.status(400).json({ message: "Invalid song data" });
+    }
 
     const playlist = await Playlist.findById(playlistId);
 
@@ -131,36 +107,31 @@ const addSongFromYouTube = async (req, res) => {
       return res.status(404).json({ message: "Playlist not found" });
     }
 
-    // Ensure ownership
+    // ownership check
     if (playlist.user.toString() !== req.user._id.toString()) {
       return res.status(401).json({ message: "Not authorized" });
     }
 
-    const newSong = {
-      name: title,
-      artist,
-      album: "",
-      youtubeLink: `https://www.youtube.com/watch?v=${videoId}`,
-      duration: "",
-    };
-
     playlist.songs.push({
-      name: req.body.name,
-      artist: req.body.artist,
-      album: req.body.album,
-      duration: req.body.duration,
-      youtubeLink: req.body.youtubeLink,
-      youtubeId: req.body.youtubeId,
-      thumbnail: req.body.thumbnail,
+      name,
+      artist,
+      album,
+      duration,
+      youtubeId,
+      youtubeLink,
+      thumbnail:
+        thumbnail || `https://i.ytimg.com/vi/${youtubeId}/hqdefault.jpg`,
     });
+
     await playlist.save();
 
     res.status(201).json({
-      message: "Song added from YouTube successfully",
+      message: "Song added successfully",
       playlist,
     });
   } catch (error) {
-    res.status(500).json({ message: error.message });
+    console.error(error);
+    res.status(500).json({ message: "Failed to add song" });
   }
 };
 
@@ -239,7 +210,6 @@ module.exports = {
   getUserPlaylists,
   deletePlaylist,
   updatePlaylistName,
-  addSongToPlaylist,
   deleteSongFromPlaylist,
   updateSongInPlaylist,
   addSongFromYouTube,

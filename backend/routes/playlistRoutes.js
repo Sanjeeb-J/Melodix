@@ -4,7 +4,6 @@ const {
   getUserPlaylists,
   deletePlaylist,
   updatePlaylistName,
-  addSongToPlaylist,
   deleteSongFromPlaylist,
   updateSongInPlaylist,
   addSongFromYouTube,
@@ -17,9 +16,8 @@ router.post("/", protect, createPlaylist);
 router.get("/", protect, getUserPlaylists);
 router.delete("/:id", protect, deletePlaylist);
 router.put("/:id", protect, updatePlaylistName);
-router.post("/:playlistId/songs", protect, addSongToPlaylist);
 router.delete("/:playlistId/songs/:songId", protect, deleteSongFromPlaylist);
 router.put("/:playlistId/songs/:songId", protect, updateSongInPlaylist);
-router.post("/:playlistId/youtube", protect, addSongFromYouTube);
+router.post("/:playlistId/songs", protect, addSongFromYouTube);
 
 module.exports = router;
