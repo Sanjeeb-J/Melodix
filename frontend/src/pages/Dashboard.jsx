@@ -5,9 +5,15 @@ import {
   addSongFromYouTube,
   deleteSong,
   updateSong,
+  updatePlaylist,
+  deletePlaylist,
 } from "../services/playlistService";
 import { useNavigate } from "react-router-dom";
 import { searchYouTube } from "../services/youtubeService";
+import { useToast } from "../components/ToastContainer";
+import EditModal from "../components/EditModal";
+import { getPlaylistCover } from "../utils/playlistCover";
+import { Edit2, Clock } from "lucide-react";
 
 function Dashboard() {
   const [searchQuery, setSearchQuery] = useState("");
@@ -22,8 +28,17 @@ function Dashboard() {
   const [currentView, setCurrentView] = useState("home");
   const [currentSong, setCurrentSong] = useState(null);
   const [isPlaying, setIsPlaying] = useState(false);
+  const [editingPlaylist, setEditingPlaylist] = useState(null);
+  const [editingPlaylistName, setEditingPlaylistName] = useState("");
+  const [editingSong, setEditingSong] = useState(null);
+  const [editingSongData, setEditingSongData] = useState({
+    name: "",
+    artist: "",
+    duration: "",
+  });
 
   const navigate = useNavigate();
+  const { showToast } = useToast();
 
   const handleLogout = () => {
     localStorage.removeItem("token");
@@ -33,7 +48,7 @@ function Dashboard() {
   const handleSearch = async () => {
     if (!searchQuery.trim()) return;
     if (!selectedPlaylist) {
-      alert("Select a playlist first");
+      showToast("Please select a playlist first", "error");
       return;
     }
 
@@ -41,8 +56,11 @@ function Dashboard() {
       setSearchLoading(true);
       const data = await searchYouTube(searchQuery);
       setSearchResults(data);
+      if (data.length === 0) {
+        showToast("No results found", "info");
+      }
     } catch {
-      alert("Search failed");
+      showToast("Search failed. Please try again.", "error");
     } finally {
       setSearchLoading(false);
     }
@@ -60,7 +78,7 @@ function Dashboard() {
         name: song.title,
         artist: song.channelTitle,
         album: "YouTube",
-        duration: "--:--",
+        duration: song.duration || "0:00",
         youtubeId: song.videoId,
         youtubeLink: `https://www.youtube.com/watch?v=${song.videoId}`,
         thumbnail: thumbnail,
@@ -70,18 +88,20 @@ function Dashboard() {
       setPlaylists((prev) =>
         prev.map((p) => (p._id === selectedPlaylist._id ? res.playlist : p))
       );
+      setSelectedPlaylist(res.playlist);
       setSearchResults([]);
       setSearchQuery("");
       setIsSearchOpen(false);
+      showToast("Song added successfully!", "success");
     } catch (err) {
       console.error(err);
-      alert("Failed to add song");
+      showToast("Failed to add song", "error");
     }
   };
 
   const handleCreatePlaylist = async () => {
     if (!newPlaylist.trim()) {
-      alert("Playlist name cannot be empty");
+      showToast("Playlist name cannot be empty", "error");
       return;
     }
 
@@ -91,24 +111,31 @@ function Dashboard() {
       setNewPlaylist("");
       setSelectedPlaylist(res.playlist);
       setCurrentView("playlist");
+      showToast("Playlist created!", "success");
     } catch (err) {
-      alert("Failed to create playlist");
+      showToast("Failed to create playlist", "error");
     }
   };
 
   const handleDeleteSong = async (playlistId, songId) => {
-    if (!window.confirm("Delete this song?")) return;
-
     try {
       await deleteSong(playlistId, songId);
       setPlaylists((prev) =>
         prev.map((p) => {
           if (p._id !== playlistId) return p;
-          return { ...p, songs: p.songs.filter((s) => s._id !== songId) };
+          const updatedPlaylist = {
+            ...p,
+            songs: p.songs.filter((s) => s._id !== songId),
+          };
+          if (selectedPlaylist?._id === playlistId) {
+            setSelectedPlaylist(updatedPlaylist);
+          }
+          return updatedPlaylist;
         })
       );
+      showToast("Song removed", "success");
     } catch (err) {
-      alert("Failed to delete song");
+      showToast("Failed to delete song", "error");
     }
   };
 
@@ -118,13 +145,88 @@ function Dashboard() {
     setIsMobileMenuOpen(false);
   };
 
-  const deletePlaylistHandler = (id) => {
-    if (window.confirm("Delete this playlist permanently?")) {
+  const handleEditPlaylist = (playlist) => {
+    setEditingPlaylist(playlist);
+    setEditingPlaylistName(playlist.name);
+  };
+
+  const savePlaylistEdit = async () => {
+    if (!editingPlaylistName.trim()) {
+      showToast("Playlist name cannot be empty", "error");
+      return;
+    }
+
+    try {
+      await updatePlaylist(editingPlaylist._id, editingPlaylistName);
+      setPlaylists((prev) =>
+        prev.map((p) =>
+          p._id === editingPlaylist._id
+            ? { ...p, name: editingPlaylistName }
+            : p
+        )
+      );
+      if (selectedPlaylist?._id === editingPlaylist._id) {
+        setSelectedPlaylist((prev) => ({ ...prev, name: editingPlaylistName }));
+      }
+      setEditingPlaylist(null);
+      showToast("Playlist updated!", "success");
+    } catch (err) {
+      showToast("Failed to update playlist", "error");
+    }
+  };
+
+  const deletePlaylistHandler = async (id) => {
+    try {
+      await deletePlaylist(id);
       setPlaylists((prev) => prev.filter((p) => p._id !== id));
       if (selectedPlaylist?._id === id) {
         setCurrentView("home");
         setSelectedPlaylist(null);
       }
+      showToast("Playlist deleted", "success");
+    } catch (err) {
+      showToast("Failed to delete playlist", "error");
+    }
+  };
+
+  const handleEditSong = (song) => {
+    setEditingSong(song);
+    setEditingSongData({
+      name: song.name,
+      artist: song.artist,
+      duration: song.duration,
+    });
+  };
+
+  const saveSongEdit = async () => {
+    if (!editingSongData.name.trim()) {
+      showToast("Song name cannot be empty", "error");
+      return;
+    }
+
+    try {
+      await updateSong(selectedPlaylist._id, editingSong._id, editingSongData);
+      setPlaylists((prev) =>
+        prev.map((p) => {
+          if (p._id !== selectedPlaylist._id) return p;
+          return {
+            ...p,
+            songs: p.songs.map((s) =>
+              s._id === editingSong._id ? { ...s, ...editingSongData } : s
+            ),
+          };
+        })
+      );
+      setSelectedPlaylist((prev) => ({
+        ...prev,
+        songs: prev.songs.map((s) =>
+          s._id === editingSong._id ? { ...s, ...editingSongData } : s
+        ),
+      }));
+      setEditingSong(null);
+      showToast("Song updated!", "success");
+    } catch (err) {
+      showToast("Failed to update song", "error");
     }
   };
 
@@ -139,8 +241,8 @@ function Dashboard() {
         const data = await getPlaylists();
         setPlaylists(data);
       } catch (error) {
-        alert("Session expired. Please login again.");
-        handleLogout();
+        showToast("Session expired. Please login again.", "error");
+        setTimeout(handleLogout, 2000);
       } finally {
         setLoading(false);
       }
@@ -175,6 +277,7 @@ function Dashboard() {
               className="h-full w-3/4 max-w-sm bg-black border-r border-zinc-900 p-6"
               onClick={(e) => e.stopPropagation()}
             >
+              {/* Sidebar Content */}
               <div className="flex items-center space-x-2 text-indigo-500 font-bold text-2xl mb-8">
                 <div className="bg-indigo-600/10 p-1.5 rounded-lg">
                   <svg
@@ -515,13 +618,17 @@ function Dashboard() {
                   </h3>
                 </div>
                 <div className="grid grid-cols-2 lg:grid-cols-4 xl:grid-cols-5 gap-6">
-                  {playlists.slice(0, 10).map((p) => (
+                  {playlists.slice(0, 10).map((p, index) => (
                     <div
                       key={p._id}
                       onClick={() => handlePlaylistSelect(p)}
                       className="group bg-zinc-900/30 p-4 rounded-3xl hover:bg-zinc-800 transition-all cursor-pointer"
                     >
-                      <div className="aspect-square rounded-2xl overflow-hidden mb-4 bg-gradient-to-br from-indigo-600 to-purple-600"></div>
+                      <div
+                        className={`aspect-square rounded-2xl overflow-hidden mb-4 bg-gradient-to-br ${getPlaylistCover(
+                          p._id
+                        )}`}
+                      ></div>
                       <h4 className="font-black truncate text-lg">{p.name}</h4>
                       <p className="text-xs text-zinc-500 font-bold uppercase">
                         {p.songs?.length || 0} Tracks
@@ -545,13 +652,17 @@ function Dashboard() {
                 </div>
               </div>
               <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-6">
-                {playlists.map((p) => (
+                {playlists.map((p, index) => (
                   <div
                     key={p._id}
                     onClick={() => handlePlaylistSelect(p)}
                     className="bg-zinc-900/30 p-4 rounded-3xl hover:bg-zinc-800 transition-all cursor-pointer group"
                   >
-                    <div className="aspect-square rounded-2xl overflow-hidden mb-4 bg-gradient-to-br from-indigo-600 to-purple-600"></div>
+                    <div
+                      className={`aspect-square rounded-2xl overflow-hidden mb-4 bg-gradient-to-br ${getPlaylistCover(
+                        p._id
+                      )}`}
+                    ></div>
                     <h4 className="font-black truncate mb-2">{p.name}</h4>
                     <span className="text-xs text-zinc-600 font-black uppercase">
                       {p.songs?.length || 0} items
@@ -566,14 +677,29 @@ function Dashboard() {
           {currentView === "playlist" && selectedPlaylist && (
             <div className="space-y-16 pb-32">
               <div className="flex flex-col md:flex-row items-center md:items-end space-y-8 md:space-y-0 md:space-x-12">
-                <div className="w-48 h-48 md:w-80 md:h-80 rounded-3xl bg-gradient-to-br from-indigo-600 to-purple-600 shadow-2xl"></div>
+                <div
+                  className={`w-48 h-48 md:w-80 md:h-80 rounded-3xl bg-gradient-to-br ${getPlaylistCover(
+                    selectedPlaylist._id
+                  )} shadow-2xl`}
+                ></div>
                 <div className="flex-1 text-center md:text-left">
                   <span className="bg-indigo-600 text-white text-xs font-black px-3 py-1 rounded-lg">
                     Private Mix
                   </span>
-                  <h1 className="text-4xl md:text-8xl font-black mt-6 mb-4">
-                    {selectedPlaylist.name}
-                  </h1>
+                  <div className="flex items-center justify-center md:justify-start gap-4 mt-6 mb-4">
+                    <h1 className="text-4xl md:text-8xl font-black">
+                      {selectedPlaylist.name}
+                    </h1>
+                    <button
+                      onClick={() => handleEditPlaylist(selectedPlaylist)}
+                      className="p-3 hover:bg-white/10 rounded-xl transition-all"
+                    >
+                      <Edit2
+                        size={28}
+                        className="text-zinc-400 hover:text-white"
+                      />
+                    </button>
+                  </div>
                   <p className="text-zinc-400 text-lg mb-10">
                     {selectedPlaylist.songs?.length || 0} tracks
                   </p>
@@ -627,6 +753,18 @@ function Dashboard() {
                   </div>
                 ) : (
                   <div className="divide-y divide-white/5">
+                    {/* Table Header */}
+                    <div className="flex items-center p-5 text-zinc-500 text-xs font-bold uppercase border-b border-white/10">
+                      <span className="w-12">#</span>
+                      <span className="flex-1">Title</span>
+                      <span className="w-32 hidden lg:block">Artist</span>
+                      <span className="w-24 hidden md:flex items-center gap-2">
+                        <Clock size={14} />
+                        Duration
+                      </span>
+                      <span className="w-32 text-right">Actions</span>
+                    </div>
+
                     {selectedPlaylist.songs.map((song, index) => (
                       <div
                         key={song._id}
@@ -640,45 +778,60 @@ function Dashboard() {
                           <img
                             src={song.thumbnail}
                             className="w-14 h-14 rounded-xl shadow-lg object-cover"
-                            alt=""
+                            alt={song.name}
                           />
                           <div className="min-w-0 flex-1">
                             <a
                               href={song.youtubeLink}
                               target="_blank"
                               rel="noopener noreferrer"
+                              onClick={(e) => e.stopPropagation()}
                               className="font-bold text-base truncate block group-hover:text-indigo-400"
                             >
                               {song.name}
                             </a>
-                            <span className="text-xs text-zinc-500 font-black uppercase truncate block">
+                            <span className="text-xs text-zinc-500 font-semibold truncate block lg:hidden">
                               {song.artist}
                             </span>
                           </div>
                         </div>
-                        <span className="text-zinc-500 text-xs font-mono mr-6 hidden md:block">
+                        <span className="w-32 text-sm text-zinc-400 truncate hidden lg:block">
+                          {song.artist}
+                        </span>
+                        <span className="w-24 text-zinc-500 text-sm font-mono hidden md:block">
                           {song.duration}
                         </span>
-                        <button
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            handleDeleteSong(selectedPlaylist._id, song._id);
-                          }}
-                          className="opacity-0 group-hover:opacity-100 p-2 text-zinc-600 hover:text-red-500 transition-all"
-                        >
-                          <svg
-                            width="18"
-                            height="18"
-                            viewBox="0 0 24 24"
-                            fill="none"
-                            stroke="currentColor"
-                            strokeWidth="2.5"
+                        <div className="w-32 flex items-center justify-end gap-2">
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              handleEditSong(song);
+                            }}
+                            className="opacity-0 group-hover:opacity-100 p-2 text-zinc-600 hover:text-indigo-400 transition-all"
                           >
-                            <path d="M3 6h18" />
-                            <path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6" />
-                            <path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2" />
-                          </svg>
-                        </button>
+                            <Edit2 size={16} />
+                          </button>
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              handleDeleteSong(selectedPlaylist._id, song._id);
+                            }}
+                            className="opacity-0 group-hover:opacity-100 p-2 text-zinc-600 hover:text-red-500 transition-all"
+                          >
+                            <svg
+                              width="18"
+                              height="18"
+                              viewBox="0 0 24 24"
+                              fill="none"
+                              stroke="currentColor"
+                              strokeWidth="2.5"
+                            >
+                              <path d="M3 6h18" />
+                              <path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6" />
+                              <path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2" />
+                            </svg>
+                          </button>
+                        </div>
                       </div>
                     ))}
                   </div>
@@ -778,6 +931,86 @@ function Dashboard() {
           </div>
         </div>
       )}
+
+      {/* Edit Playlist Modal */}
+      <EditModal
+        isOpen={!!editingPlaylist}
+        onClose={() => setEditingPlaylist(null)}
+        onSave={savePlaylistEdit}
+        title="Edit Playlist"
+      >
+        <div className="space-y-2">
+          <label className="text-sm font-semibold text-zinc-400 uppercase tracking-wider">
+            Playlist Name
+          </label>
+          <input
+            type="text"
+            value={editingPlaylistName}
+            onChange={(e) => setEditingPlaylistName(e.target.value)}
+            className="w-full bg-zinc-900/50 border border-white/10 rounded-xl px-4 py-3 text-white outline-none focus:border-indigo-500 transition-all"
+            placeholder="Enter playlist name"
+          />
+        </div>
+      </EditModal>
+
+      {/* Edit Song Modal */}
+      <EditModal
+        isOpen={!!editingSong}
+        onClose={() => setEditingSong(null)}
+        onSave={saveSongEdit}
+        title="Edit Song"
+      >
+        <div className="space-y-4">
+          <div className="space-y-2">
+            <label className="text-sm font-semibold text-zinc-400 uppercase tracking-wider">
+              Song Name
+            </label>
+            <input
+              type="text"
+              value={editingSongData.name}
+              onChange={(e) =>
+                setEditingSongData({ ...editingSongData, name: e.target.value })
+              }
+              className="w-full bg-zinc-900/50 border border-white/10 rounded-xl px-4 py-3 text-white outline-none focus:border-indigo-500 transition-all"
+              placeholder="Enter song name"
+            />
+          </div>
+          <div className="space-y-2">
+            <label className="text-sm font-semibold text-zinc-400 uppercase tracking-wider">
+              Artist
+            </label>
+            <input
+              type="text"
+              value={editingSongData.artist}
+              onChange={(e) =>
+                setEditingSongData({
+                  ...editingSongData,
+                  artist: e.target.value,
+                })
+              }
+              className="w-full bg-zinc-900/50 border border-white/10 rounded-xl px-4 py-3 text-white outline-none focus:border-indigo-500 transition-all"
+              placeholder="Enter artist name"
+            />
+          </div>
+          <div className="space-y-2">
+            <label className="text-sm font-semibold text-zinc-400 uppercase tracking-wider">
+              Duration
+            </label>
+            <input
+              type="text"
+              value={editingSongData.duration}
+              onChange={(e) =>
+                setEditingSongData({
+                  ...editingSongData,
+                  duration: e.target.value,
+                })
+              }
+              className="w-full bg-zinc-900/50 border border-white/10 rounded-xl px-4 py-3 text-white outline-none focus:border-indigo-500 transition-all"
+              placeholder="e.g., 3:45"
+            />
+          </div>
+        </div>
+      </EditModal>
     </div>
   );
 }
