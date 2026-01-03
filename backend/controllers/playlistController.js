@@ -94,41 +94,36 @@ const updatePlaylistName = async (req, res) => {
 const addSongFromYouTube = async (req, res) => {
   try {
     const { playlistId } = req.params;
+
     const { name, artist, album, duration, youtubeId, youtubeLink, thumbnail } =
       req.body;
 
-    if (!youtubeId || !youtubeLink || !name) {
+    if (!name || !youtubeId) {
       return res.status(400).json({ message: "Invalid song data" });
     }
 
-    const playlist = await Playlist.findById(playlistId);
+    const playlist = await Playlist.findOne({
+      _id: playlistId,
+      user: req.user._id,
+    });
 
     if (!playlist) {
       return res.status(404).json({ message: "Playlist not found" });
-    }
-
-    // ownership check
-    if (playlist.user.toString() !== req.user._id.toString()) {
-      return res.status(401).json({ message: "Not authorized" });
     }
 
     playlist.songs.push({
       name,
       artist,
       album,
-      duration,
+      duration: duration || "--:--", // ✅ SAVE DURATION
       youtubeId,
       youtubeLink,
-      thumbnail:
-        thumbnail || `https://i.ytimg.com/vi/${youtubeId}/hqdefault.jpg`,
+      thumbnail,
     });
 
     await playlist.save();
 
-    res.status(201).json({
-      message: "Song added successfully",
-      playlist,
-    });
+    res.status(201).json({ playlist });
   } catch (error) {
     console.error(error);
     res.status(500).json({ message: "Failed to add song" });

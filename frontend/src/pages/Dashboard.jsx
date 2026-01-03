@@ -36,6 +36,9 @@ function Dashboard() {
     artist: "",
     duration: "",
   });
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+  const [showCreatePlaylist, setShowCreatePlaylist] = useState(false);
+  const [newPlaylistName, setNewPlaylistName] = useState("");
 
   const navigate = useNavigate();
   const { showToast } = useToast();
@@ -68,30 +71,27 @@ function Dashboard() {
 
   const handleAddSong = async (song) => {
     try {
-      const thumbnail =
-        song.thumbnails?.medium?.url ||
-        song.thumbnails?.high?.url ||
-        song.thumbnails?.default?.url ||
-        `https://i.ytimg.com/vi/${song.videoId}/hqdefault.jpg`;
-
       const payload = {
         name: song.title,
-        artist: song.channelTitle,
+        artist: song.artist,
         album: "YouTube",
-        duration: song.duration || "0:00",
+        duration: song.duration,
         youtubeId: song.videoId,
-        youtubeLink: `https://www.youtube.com/watch?v=${song.videoId}`,
-        thumbnail: thumbnail,
+        youtubeLink: song.youtubeLink,
+        thumbnail: song.thumbnail,
       };
 
       const res = await addSongFromYouTube(selectedPlaylist._id, payload);
+
       setPlaylists((prev) =>
         prev.map((p) => (p._id === selectedPlaylist._id ? res.playlist : p))
       );
+
       setSelectedPlaylist(res.playlist);
       setSearchResults([]);
       setSearchQuery("");
       setIsSearchOpen(false);
+
       showToast("Song added successfully!", "success");
     } catch (err) {
       console.error(err);
@@ -99,20 +99,19 @@ function Dashboard() {
     }
   };
 
-  const handleCreatePlaylist = async () => {
-    if (!newPlaylist.trim()) {
+  const handleCreatePlaylist = async (name) => {
+    if (!name.trim()) {
       showToast("Playlist name cannot be empty", "error");
       return;
     }
 
     try {
-      const res = await createPlaylist(newPlaylist);
+      const res = await createPlaylist(name);
       setPlaylists((prev) => [res.playlist, ...prev]);
-      setNewPlaylist("");
       setSelectedPlaylist(res.playlist);
       setCurrentView("playlist");
       showToast("Playlist created!", "success");
-    } catch (err) {
+    } catch {
       showToast("Failed to create playlist", "error");
     }
   };
@@ -355,8 +354,7 @@ function Dashboard() {
                 <button
                   onClick={() => {
                     setIsMobileMenuOpen(false);
-                    setNewPlaylist("New Mix");
-                    handleCreatePlaylist();
+                    handleCreatePlaylist("New Mix");
                   }}
                   className="text-zinc-500 hover:text-white p-1 bg-zinc-900 rounded-md"
                 >
@@ -594,17 +592,14 @@ function Dashboard() {
                 </p>
                 <div className="flex flex-col sm:flex-row gap-4">
                   <button
-                    onClick={() => {
-                      setNewPlaylist("New Mix");
-                      handleCreatePlaylist();
-                    }}
+                    onClick={() => setShowCreatePlaylist(true)}
                     className="bg-white text-black font-black px-10 py-4 rounded-full hover:scale-105 transition-all"
                   >
                     Create New Mix
                   </button>
                   <button
                     onClick={() => setCurrentView("library")}
-                    className="bg-white/5 text-white font-black px-10 py-4 rounded-full border border-white/10 hover:bg-white/10 transition-all"
+                    className="bg-white/5 teCreate New Mixxt-white font-black px-10 py-4 rounded-full border border-white/10 hover:bg-white/10 transition-all"
                   >
                     Explore Library
                   </button>
@@ -739,7 +734,8 @@ function Dashboard() {
                   <p className="text-zinc-400 text-lg mb-10">
                     {selectedPlaylist.songs?.length || 0} tracks
                   </p>
-                  <div className="flex items-center justify-center md:justify-start space-x-6">
+                  <div className="flex items-center justify-center md:justify-start space-x-4">
+                    {/* Play Button */}
                     <button className="w-16 h-16 bg-white rounded-full flex items-center justify-center hover:scale-110 transition-all text-black">
                       <svg
                         width="24"
@@ -751,22 +747,21 @@ function Dashboard() {
                         <path d="M8 5v14l11-7z" />
                       </svg>
                     </button>
+
+                    {/* DELETE PLAYLIST BUTTON */}
+                    <button
+                      onClick={() => setShowDeleteConfirm(true)}
+                      className="bg-red-600/90 hover:bg-red-600 px-8 py-4 rounded-3xl font-black transition-all"
+                    >
+                      Delete
+                    </button>
+
+                    {/* ADD SONG BUTTON */}
                     <button
                       onClick={() => setIsSearchOpen(true)}
-                      className="bg-indigo-600 hover:bg-indigo-500 px-10 py-5 rounded-3xl font-black flex items-center space-x-4 transition-all"
+                      className="bg-indigo-600 hover:bg-indigo-500 px-10 py-4 rounded-3xl font-black flex items-center space-x-4 transition-all"
                     >
-                      <svg
-                        width="20"
-                        height="20"
-                        viewBox="0 0 24 24"
-                        fill="none"
-                        stroke="currentColor"
-                        strokeWidth="3"
-                      >
-                        <path d="M5 12h14" />
-                        <path d="M12 5v14" />
-                      </svg>
-                      <span>Add Songs</span>
+                      <span>+ Add Songs</span>
                     </button>
                   </div>
                 </div>
@@ -843,16 +838,17 @@ function Dashboard() {
                               e.stopPropagation();
                               handleEditSong(song);
                             }}
-                            className="opacity-0 group-hover:opacity-100 p-2 text-zinc-600 hover:text-indigo-400 transition-all"
+                            className="opacity-100 md:opacity-0 md:group-hover:opacity-100 p-2 text-zinc-600 hover:text-indigo-400 transition-all"
                           >
                             <Edit2 size={16} />
                           </button>
+
                           <button
                             onClick={(e) => {
                               e.stopPropagation();
                               handleDeleteSong(selectedPlaylist._id, song._id);
                             }}
-                            className="opacity-0 group-hover:opacity-100 p-2 text-zinc-600 hover:text-red-500 transition-all"
+                            className="opacity-100 md:opacity-0 md:group-hover:opacity-100 p-2 text-zinc-600 hover:text-red-500 transition-all"
                           >
                             <svg
                               width="18"
@@ -941,18 +937,23 @@ function Dashboard() {
                       <div className="flex items-center space-x-5 min-w-0">
                         <img
                           src={
-                            song.thumbnails?.medium?.url ||
-                            `https://i.ytimg.com/vi/${song.videoId}/default.jpg`
+                            song.thumbnail ||
+                            `https://i.ytimg.com/vi/${song.videoId}/hqdefault.jpg`
                           }
                           className="w-16 h-16 rounded-2xl object-cover"
-                          alt=""
+                          alt={song.title}
                         />
+
                         <div className="min-w-0">
                           <h4 className="text-white font-bold text-xl truncate">
                             {song.title}
                           </h4>
                           <p className="text-xs text-zinc-500 font-black uppercase truncate">
-                            {song.channelTitle}
+                            {song.artist}
+                          </p>
+
+                          <p className="text-xs text-zinc-400 font-mono mt-1">
+                            {song.duration}
                           </p>
                         </div>
                       </div>
@@ -1047,6 +1048,82 @@ function Dashboard() {
           </div>
         </div>
       </EditModal>
+      {showDeleteConfirm && (
+        <div className="fixed inset-0 z-[200] bg-black/80 backdrop-blur-sm flex items-center justify-center">
+          <div className="bg-zinc-950 rounded-3xl p-8 w-full max-w-md border border-white/10">
+            <h3 className="text-2xl font-black mb-4">Delete Playlist</h3>
+            <p className="text-zinc-400 mb-8">
+              Are you sure you want to delete this playlist? This action cannot
+              be undone.
+            </p>
+
+            <div className="flex justify-end space-x-4">
+              <button
+                onClick={() => setShowDeleteConfirm(false)}
+                className="px-6 py-3 rounded-xl bg-white/5 hover:bg-white/10 font-bold transition-all"
+              >
+                Cancel
+              </button>
+
+              <button
+                onClick={async () => {
+                  await deletePlaylistHandler(selectedPlaylist._id);
+                  setShowDeleteConfirm(false);
+                  setCurrentView("home");
+                  setSelectedPlaylist(null);
+                }}
+                className="px-6 py-3 rounded-xl bg-red-600 hover:bg-red-500 font-bold transition-all"
+              >
+                Delete
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+      {showCreatePlaylist && (
+        <div className="fixed inset-0 z-[200] bg-black/80 backdrop-blur-sm flex items-center justify-center">
+          <div className="bg-zinc-950 rounded-3xl p-8 w-full max-w-md border border-white/10">
+            <h3 className="text-2xl font-black mb-4">Create New Playlist</h3>
+
+            <input
+              type="text"
+              placeholder="Playlist name"
+              value={newPlaylistName}
+              onChange={(e) => setNewPlaylistName(e.target.value)}
+              className="w-full bg-zinc-900 border border-white/10 rounded-xl px-4 py-3 text-white outline-none focus:border-indigo-500 mb-6"
+              autoFocus
+            />
+
+            <div className="flex justify-end space-x-4">
+              <button
+                onClick={() => {
+                  setShowCreatePlaylist(false);
+                  setNewPlaylistName("");
+                }}
+                className="px-6 py-3 rounded-xl bg-white/5 hover:bg-white/10 font-bold transition-all"
+              >
+                Cancel
+              </button>
+
+              <button
+                onClick={async () => {
+                  if (!newPlaylistName.trim()) return;
+
+                  await handleCreatePlaylist(newPlaylistName);
+                  setShowCreatePlaylist(false);
+                  setNewPlaylistName("");
+
+                  setShowCreatePlaylist(false);
+                  setNewPlaylistName("");
+                }}
+                className="px-6 py-3 rounded-xl bg-indigo-600 hover:bg-indigo-500 font-bold transition-all"
+              >
+                Create
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
