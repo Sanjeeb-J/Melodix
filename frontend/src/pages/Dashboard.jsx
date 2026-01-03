@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+
 import {
   getPlaylists,
   createPlaylist,
@@ -17,14 +18,25 @@ import { getPlaylistCover } from "../utils/playlistCover";
 import { Edit2, Clock, User } from "lucide-react";
 import { getUserProfile, updateUserProfile } from "../services/authService";
 
+import { getPlaylists, createPlaylist } from "../services/playlistService";
+import { useNavigate } from "react-router-dom";
+import { searchYouTube } from "../services/youtubeService";
+import { addSongFromYouTube } from "../services/playlistService";
+import { deleteSong } from "../services/playlistService";
+import { updateSong } from "../services/playlistService";
+
+
 function Dashboard() {
   const [searchQuery, setSearchQuery] = useState("");
   const [searchResults, setSearchResults] = useState([]);
   const [searchLoading, setSearchLoading] = useState(false);
+
   const [newPlaylist, setNewPlaylist] = useState("");
   const [playlists, setPlaylists] = useState([]);
   const [loading, setLoading] = useState(true);
+
   const [selectedPlaylist, setSelectedPlaylist] = useState(null);
+
   const [isSearchOpen, setIsSearchOpen] = useState(false);
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const [currentView, setCurrentView] = useState("home");
@@ -43,6 +55,14 @@ function Dashboard() {
   const [isProfileModalOpen, setIsProfileModalOpen] = useState(false);
   const [userProfile, setUserProfile] = useState(null);
 
+
+  const [editingSong, setEditingSong] = useState(null);
+  const [editData, setEditData] = useState({
+    name: "",
+    artist: "",
+    youtubeLink: "",
+  });
+
   const navigate = useNavigate();
   const { showToast } = useToast();
 
@@ -50,6 +70,7 @@ function Dashboard() {
     localStorage.removeItem("token");
     setIsProfileModalOpen(false);
     navigate("/");
+    navigate("/login");
   };
 
   const handleUpdateProfile = async (profileData) => {
@@ -103,7 +124,7 @@ function Dashboard() {
         song.thumbnails?.medium?.url ||
         song.thumbnails?.high?.url ||
         song.thumbnails?.default?.url ||
-        `https://i.ytimg.com/vi/${song.videoId}/hqdefault.jpg`;
+        "https://i.ytimg.com/vi/" + song.videoId + "/hqdefault.jpg";
 
       const payload = {
         name: song.title,
@@ -112,18 +133,22 @@ function Dashboard() {
         duration: song.duration || "0:00",
         youtubeId: song.videoId,
         youtubeLink: `https://www.youtube.com/watch?v=${song.videoId}`,
-        thumbnail: thumbnail,
+        thumbnail: thumbnail, // 👈 GUARANTEED
       };
 
       const res = await addSongFromYouTube(selectedPlaylist._id, payload);
+
       setPlaylists((prev) =>
         prev.map((p) => (p._id === selectedPlaylist._id ? res.playlist : p))
       );
+<<<<<<< HEAD
       setSelectedPlaylist(res.playlist);
       setSearchResults([]);
       setSearchQuery("");
       setIsSearchOpen(false);
       showToast("Song added successfully!", "success");
+=======
+>>>>>>> parent of 949be2d (Frontend Done)
     } catch (err) {
       console.error(err);
       showToast("Failed to add song", "error");
@@ -145,10 +170,13 @@ function Dashboard() {
       const res = await createPlaylist(newPlaylist);
       setPlaylists((prev) => [res.playlist, ...prev]);
       setNewPlaylist("");
+<<<<<<< HEAD
       setSelectedPlaylist(res.playlist);
       setCurrentView("playlist");
       setIsCreatePlaylistModalOpen(false);
       showToast("Playlist created!", "success");
+=======
+>>>>>>> parent of 949be2d (Frontend Done)
     } catch (err) {
       showToast("Failed to create playlist", "error");
     }
@@ -156,10 +184,12 @@ function Dashboard() {
 
   const handleDeleteSong = async (playlistId, songId) => {
     try {
-      await deleteSong(playlistId, songId);
+      const res = await deleteSong(playlistId, songId);
+
       setPlaylists((prev) =>
         prev.map((p) => {
           if (p._id !== playlistId) return p;
+<<<<<<< HEAD
           const updatedPlaylist = {
             ...p,
             songs: p.songs.filter((s) => s._id !== songId),
@@ -168,20 +198,35 @@ function Dashboard() {
             setSelectedPlaylist(updatedPlaylist);
           }
           return updatedPlaylist;
+=======
+          return {
+            ...p,
+            songs: p.songs.filter((s) => s._id !== songId),
+          };
+>>>>>>> parent of 949be2d (Frontend Done)
         })
       );
       showToast("Song removed", "success");
     } catch (err) {
+<<<<<<< HEAD
       showToast("Failed to delete song", "error");
+=======
+      alert("Failed to delete song");
+      console.error(err);
+>>>>>>> parent of 949be2d (Frontend Done)
     }
   };
 
-  const handlePlaylistSelect = (playlist) => {
-    setSelectedPlaylist(playlist);
-    setCurrentView("playlist");
-    setIsMobileMenuOpen(false);
+  const startEditSong = (song) => {
+    setEditingSong(song._id);
+    setEditData({
+      name: song.name,
+      artist: song.artist,
+      youtubeLink: song.youtubeLink,
+    });
   };
 
+<<<<<<< HEAD
   const handleEditPlaylist = (playlist) => {
     setEditingPlaylist(playlist);
     setEditingPlaylistName(playlist.name);
@@ -266,12 +311,20 @@ function Dashboard() {
       showToast("Song updated!", "success");
     } catch (err) {
       showToast("Failed to update song", "error");
-    }
-  };
+=======
+  const handleUpdateSong = async (playlistId, songId) => {
+    try {
+      const res = await updateSong(playlistId, songId, editData);
 
-  const playSong = (song) => {
-    setCurrentSong(song);
-    setIsPlaying(true);
+      setPlaylists((prev) =>
+        prev.map((p) => (p._id === playlistId ? res.playlist : p))
+      );
+
+      setEditingSong(null);
+    } catch {
+      alert("Failed to update song");
+>>>>>>> parent of 949be2d (Frontend Done)
+    }
   };
 
   useEffect(() => {
@@ -290,80 +343,58 @@ function Dashboard() {
         setLoading(false);
       }
     };
+<<<<<<< HEAD
     fetchData();
+=======
+
+    fetchPlaylists();
+>>>>>>> parent of 949be2d (Frontend Done)
   }, []);
 
-  if (loading) {
-    return (
-      <div className="min-h-screen bg-black flex items-center justify-center">
-        <div className="w-16 h-16 border-4 border-indigo-500 border-t-transparent rounded-full animate-spin"></div>
-      </div>
-    );
-  }
+  if (loading) return <p>Loading playlists...</p>;
 
   return (
-    <div className="h-screen flex flex-col bg-black text-white selection:bg-indigo-500/50 relative overflow-hidden">
-      {/* Background decoration */}
-      <div className="absolute top-0 left-0 w-full h-full pointer-events-none opacity-30">
-        <div className="absolute top-0 right-0 w-1/2 h-1/2 bg-indigo-900/10 blur-[150px] rounded-full"></div>
-        <div className="absolute bottom-0 left-0 w-1/2 h-1/2 bg-purple-900/10 blur-[150px] rounded-full"></div>
+    <div>
+      <h2>Dashboard</h2>
+      <button onClick={handleLogout}>Logout</button>
+
+      <div style={{ marginTop: "10px" }}>
+        <input
+          placeholder="New playlist name"
+          value={newPlaylist}
+          onChange={(e) => setNewPlaylist(e.target.value)}
+        />
+        <button onClick={handleCreatePlaylist}>Create Playlist</button>
       </div>
 
-      <div className="flex-1 flex overflow-hidden relative z-10">
-        {/* Mobile Menu Overlay */}
-        {isMobileMenuOpen && (
-          <div
-            className="fixed inset-0 z-[60] bg-black/80 backdrop-blur-sm md:hidden"
-            onClick={() => setIsMobileMenuOpen(false)}
-          >
-            <div
-              className="h-full w-3/4 max-w-sm bg-black border-r border-zinc-900 p-6"
-              onClick={(e) => e.stopPropagation()}
-            >
-              {/* Sidebar Content */}
-              <div className="flex items-center space-x-2 text-indigo-500 font-bold text-2xl mb-8">
-                <div className="bg-indigo-600/10 p-1.5 rounded-lg">
-                  <svg
-                    width="28"
-                    height="28"
-                    viewBox="0 0 24 24"
-                    fill="none"
-                    stroke="currentColor"
-                    strokeWidth="2.5"
-                  >
-                    <path d="M9 18V5l12-2v13" />
-                    <circle cx="6" cy="18" r="3" />
-                    <circle cx="18" cy="16" r="3" />
-                  </svg>
-                </div>
-                <span>Melodix</span>
-              </div>
+      {selectedPlaylist && (
+        <p>
+          Selected Playlist: <strong>{selectedPlaylist.name}</strong>
+        </p>
+      )}
 
-              <nav className="space-y-1 mb-8">
+      {selectedPlaylist && (
+        <div style={{ marginTop: "20px" }}>
+          <input
+            placeholder="Search song on YouTube"
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+          />
+          <button onClick={handleSearch}>Search</button>
+
+          {searchLoading && <p>Searching...</p>}
+
+          <ul>
+            {searchResults.map((song) => (
+              <li key={song.videoId}>
+                {song.title}
                 <button
-                  onClick={() => {
-                    setCurrentView("home");
-                    setIsMobileMenuOpen(false);
-                  }}
-                  className={`flex items-center space-x-4 w-full px-4 py-3 rounded-xl transition-all ${
-                    currentView === "home"
-                      ? "bg-white/10 text-white"
-                      : "text-zinc-400 hover:text-white"
-                  }`}
+                  style={{ marginLeft: "10px" }}
+                  onClick={() => handleAddSong(song)}
                 >
-                  <svg
-                    width="20"
-                    height="20"
-                    viewBox="0 0 24 24"
-                    fill="none"
-                    stroke="currentColor"
-                    strokeWidth="2"
-                  >
-                    <path d="m3 9 9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z" />
-                    <polyline points="9 22 9 12 15 12 15 22" />
-                  </svg>
-                  <span className="font-semibold text-sm">Home</span>
+                  Add
                 </button>
+<<<<<<< HEAD
                 <button
                   onClick={() => {
                     setCurrentView("library");
@@ -1082,6 +1113,87 @@ function Dashboard() {
         onUpdateProfile={handleUpdateProfile}
         onLogout={handleLogout}
       />
+=======
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
+
+      <h3>Your Playlists</h3>
+
+      {playlists.length === 0 && <p>No playlists yet</p>}
+
+      {playlists.map((playlist) => (
+        <div key={playlist._id} style={{ marginBottom: "20px" }}>
+          <h4
+            onClick={() => setSelectedPlaylist(playlist)}
+            style={{
+              cursor: "pointer",
+              color: selectedPlaylist?._id === playlist._id ? "green" : "black",
+            }}
+          >
+            {playlist.name}
+          </h4>
+
+          <button onClick={() => updatePlaylist(playlist._id, "New Name")}>
+            Edit
+          </button>
+          <button onClick={() => deletePlaylist(playlist._id)}>Delete</button>
+
+          {playlist.songs.length === 0 ? (
+            <p>No songs in this playlist</p>
+          ) : (
+            <ul>
+              {playlist.songs.map((song) => (
+                <li
+                  key={song._id}
+                  style={{
+                    display: "flex",
+                    alignItems: "center",
+                    gap: "12px",
+                    marginBottom: "12px",
+                  }}
+                >
+                  <img
+                    src={song.thumbnail}
+                    alt={song.name}
+                    style={{
+                      width: "60px",
+                      height: "60px",
+                      borderRadius: "6px",
+                    }}
+                  />
+
+                  <div style={{ flexGrow: 1 }}>
+                    <a
+                      href={song.youtubeLink}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      style={{ fontWeight: "bold", color: "#4ea1ff" }}
+                    >
+                      {song.name}
+                    </a>
+                    <div>{song.artist}</div>
+                  </div>
+
+                  <div>
+                    {song.album} | {song.duration}
+                  </div>
+
+                  <button onClick={() => startEditSong(song)}>Edit</button>
+                  <button
+                    onClick={() => handleDeleteSong(playlist._id, song._id)}
+                  >
+                    Delete
+                  </button>
+                </li>
+              ))}
+            </ul>
+          )}
+        </div>
+      ))}
+>>>>>>> parent of 949be2d (Frontend Done)
     </div>
   );
 }
