@@ -258,14 +258,14 @@ function Dashboard() {
   }
 
   return (
-    <div className="h-screen flex flex-col bg-black text-white selection:bg-indigo-500/50 relative overflow-hidden">
+    <div className="h-screen w-full flex flex-col bg-black text-white selection:bg-indigo-500/50 relative overflow-hidden">
       {/* Background decoration */}
       <div className="absolute top-0 left-0 w-full h-full pointer-events-none opacity-30">
         <div className="absolute top-0 right-0 w-1/2 h-1/2 bg-indigo-900/10 blur-[150px] rounded-full"></div>
         <div className="absolute bottom-0 left-0 w-1/2 h-1/2 bg-purple-900/10 blur-[150px] rounded-full"></div>
       </div>
 
-      <div className="flex-1 flex overflow-hidden relative z-10">
+      <div className="flex-1 w-full flex overflow-hidden relative z-10">
         {/* Mobile Menu Overlay */}
         {isMobileMenuOpen && (
           <div
@@ -525,7 +525,7 @@ function Dashboard() {
           </button>
         </div>
 
-        <main className="flex-1 overflow-y-auto bg-gradient-to-b from-transparent to-black p-4 md:p-8">
+        <main className="flex-1 w-full overflow-y-auto bg-gradient-to-b from-transparent to-black p-4 md:p-8">
           {/* Mobile Header */}
           <header className="flex md:hidden items-center justify-between mb-6 sticky top-0 bg-black/50 backdrop-blur-md -mx-4 px-4 py-3 z-40 border-b border-white/5">
             <button
