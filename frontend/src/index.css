@@ -54,6 +54,7 @@ button:focus-visible {
   outline: 4px auto -webkit-focus-ring-color;
 }
 
+<<<<<<< HEAD
 ::-webkit-scrollbar-track {
   background: transparent;
 }
@@ -258,6 +259,8 @@ a:focus-visible {
 }
 
 /* Dark Mode Support (already dark by default) */
+=======
+>>>>>>> parent of 949be2d (Frontend Done)
 @media (prefers-color-scheme: light) {
   :root {
     color: #213547;

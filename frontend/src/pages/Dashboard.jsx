@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+<<<<<<< HEAD
 
 import {
   getPlaylists,
@@ -25,6 +26,14 @@ import { addSongFromYouTube } from "../services/playlistService";
 import { deleteSong } from "../services/playlistService";
 import { updateSong } from "../services/playlistService";
 
+=======
+import { getPlaylists, createPlaylist } from "../services/playlistService";
+import { useNavigate } from "react-router-dom";
+import { searchYouTube } from "../services/youtubeService";
+import { addSongFromYouTube } from "../services/playlistService";
+import { deleteSong } from "../services/playlistService";
+import { updateSong } from "../services/playlistService";
+>>>>>>> parent of 949be2d (Frontend Done)
 
 function Dashboard() {
   const [searchQuery, setSearchQuery] = useState("");
@@ -37,6 +46,7 @@ function Dashboard() {
 
   const [selectedPlaylist, setSelectedPlaylist] = useState(null);
 
+<<<<<<< HEAD
   const [isSearchOpen, setIsSearchOpen] = useState(false);
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const [currentView, setCurrentView] = useState("home");
@@ -56,6 +66,8 @@ function Dashboard() {
   const [userProfile, setUserProfile] = useState(null);
 
 
+=======
+>>>>>>> parent of 949be2d (Frontend Done)
   const [editingSong, setEditingSong] = useState(null);
   const [editData, setEditData] = useState({
     name: "",
@@ -68,6 +80,7 @@ function Dashboard() {
 
   const handleLogout = () => {
     localStorage.removeItem("token");
+<<<<<<< HEAD
     setIsProfileModalOpen(false);
     navigate("/");
     navigate("/login");
@@ -95,6 +108,9 @@ function Dashboard() {
     } catch (err) {
       showToast(err.message || "Failed to update profile", "error");
     }
+=======
+    navigate("/login");
+>>>>>>> parent of 949be2d (Frontend Done)
   };
 
   const handleSearch = async () => {
@@ -142,11 +158,14 @@ function Dashboard() {
         prev.map((p) => (p._id === selectedPlaylist._id ? res.playlist : p))
       );
 <<<<<<< HEAD
+<<<<<<< HEAD
       setSelectedPlaylist(res.playlist);
       setSearchResults([]);
       setSearchQuery("");
       setIsSearchOpen(false);
       showToast("Song added successfully!", "success");
+=======
+>>>>>>> parent of 949be2d (Frontend Done)
 =======
 >>>>>>> parent of 949be2d (Frontend Done)
     } catch (err) {
@@ -171,10 +190,13 @@ function Dashboard() {
       setPlaylists((prev) => [res.playlist, ...prev]);
       setNewPlaylist("");
 <<<<<<< HEAD
+<<<<<<< HEAD
       setSelectedPlaylist(res.playlist);
       setCurrentView("playlist");
       setIsCreatePlaylistModalOpen(false);
       showToast("Playlist created!", "success");
+=======
+>>>>>>> parent of 949be2d (Frontend Done)
 =======
 >>>>>>> parent of 949be2d (Frontend Done)
     } catch (err) {
@@ -190,6 +212,7 @@ function Dashboard() {
         prev.map((p) => {
           if (p._id !== playlistId) return p;
 <<<<<<< HEAD
+<<<<<<< HEAD
           const updatedPlaylist = {
             ...p,
             songs: p.songs.filter((s) => s._id !== songId),
@@ -199,10 +222,15 @@ function Dashboard() {
           }
           return updatedPlaylist;
 =======
+=======
+>>>>>>> parent of 949be2d (Frontend Done)
           return {
             ...p,
             songs: p.songs.filter((s) => s._id !== songId),
           };
+<<<<<<< HEAD
+>>>>>>> parent of 949be2d (Frontend Done)
+=======
 >>>>>>> parent of 949be2d (Frontend Done)
         })
       );
@@ -213,6 +241,9 @@ function Dashboard() {
 =======
       alert("Failed to delete song");
       console.error(err);
+<<<<<<< HEAD
+>>>>>>> parent of 949be2d (Frontend Done)
+=======
 >>>>>>> parent of 949be2d (Frontend Done)
     }
   };
@@ -226,6 +257,7 @@ function Dashboard() {
     });
   };
 
+<<<<<<< HEAD
 <<<<<<< HEAD
   const handleEditPlaylist = (playlist) => {
     setEditingPlaylist(playlist);
@@ -327,6 +359,22 @@ function Dashboard() {
     }
   };
 
+=======
+  const handleUpdateSong = async (playlistId, songId) => {
+    try {
+      const res = await updateSong(playlistId, songId, editData);
+
+      setPlaylists((prev) =>
+        prev.map((p) => (p._id === playlistId ? res.playlist : p))
+      );
+
+      setEditingSong(null);
+    } catch {
+      alert("Failed to update song");
+    }
+  };
+
+>>>>>>> parent of 949be2d (Frontend Done)
   useEffect(() => {
     const fetchData = async () => {
       try {
@@ -344,8 +392,11 @@ function Dashboard() {
       }
     };
 <<<<<<< HEAD
+<<<<<<< HEAD
     fetchData();
 =======
+=======
+>>>>>>> parent of 949be2d (Frontend Done)
 
     fetchPlaylists();
 >>>>>>> parent of 949be2d (Frontend Done)
@@ -394,6 +445,7 @@ function Dashboard() {
                 >
                   Add
                 </button>
+<<<<<<< HEAD
 <<<<<<< HEAD
                 <button
                   onClick={() => {
@@ -1120,6 +1172,14 @@ function Dashboard() {
         </div>
       )}
 
+=======
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
+
+>>>>>>> parent of 949be2d (Frontend Done)
       <h3>Your Playlists</h3>
 
       {playlists.length === 0 && <p>No playlists yet</p>}
@@ -1193,6 +1253,9 @@ function Dashboard() {
           )}
         </div>
       ))}
+<<<<<<< HEAD
+>>>>>>> parent of 949be2d (Frontend Done)
+=======
 >>>>>>> parent of 949be2d (Frontend Done)
     </div>
   );
