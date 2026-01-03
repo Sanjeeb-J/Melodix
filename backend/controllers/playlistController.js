@@ -78,10 +78,7 @@ const updatePlaylistName = async (req, res) => {
       return res.status(400).json({ message: "Playlist name is required" });
     }
 
-    playlist.name = req.body.name;
-    await playlist.save();
-    res.json({ playlist });
-
+    playlist.name = name;
     await playlist.save();
 
     res.json({
@@ -184,11 +181,7 @@ const deleteSongFromPlaylist = async (req, res) => {
     }
 
     // Filter out the song
-    playlist.songs = playlist.songs.filter(
-      (s) => s._id.toString() !== req.params.songId
-    );
-    await playlist.save();
-    res.json({ playlist });
+    playlist.songs = playlist.songs.filter((s) => s._id.toString() !== songId);
 
     await playlist.save();
 
@@ -218,27 +211,17 @@ const updateSongInPlaylist = async (req, res) => {
       return res.status(401).json({ message: "Not authorized" });
     }
 
-    const song = playlist.songs.id(req.params.songId);
-
-    song.name = req.body.name;
-    song.artist = req.body.artist;
-    song.album = req.body.album;
-    song.duration = req.body.duration;
-    song.youtubeLink = req.body.youtubeLink;
-
-    await playlist.save();
-    res.json({ playlist });
+    const song = playlist.songs.id(songId);
 
     if (!song) {
       return res.status(404).json({ message: "Song not found" });
     }
 
-    // Update only provided fields
     if (name) song.name = name;
     if (artist) song.artist = artist;
     if (album) song.album = album;
-    if (youtubeLink) song.youtubeLink = youtubeLink;
     if (duration) song.duration = duration;
+    if (youtubeLink) song.youtubeLink = youtubeLink;
 
     await playlist.save();
 

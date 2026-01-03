@@ -17,7 +17,7 @@ router.post("/", protect, createPlaylist);
 router.get("/", protect, getUserPlaylists);
 router.delete("/:id", protect, deletePlaylist);
 router.put("/:id", protect, updatePlaylistName);
-router.post("/:id/songs", protect, addSongToPlaylist);
+router.post("/:playlistId/songs", protect, addSongToPlaylist);
 router.delete("/:playlistId/songs/:songId", protect, deleteSongFromPlaylist);
 router.put("/:playlistId/songs/:songId", protect, updateSongInPlaylist);
 router.post("/:playlistId/youtube", protect, addSongFromYouTube);
