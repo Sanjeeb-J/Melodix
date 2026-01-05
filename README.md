@@ -1,5 +1,3 @@
----
-
 # Melodix 🎵
 
 **Live Demo:** [Melodix.app](https://melodix-frontend-beta.vercel.app/)
@@ -95,5 +93,3 @@ This project is licensed under the **MIT License**. See the `LICENSE` file for d
 ## 👨‍💻 Developer
 
 **Sanjeeb J** *Full-Stack Web Developer* [GitHub Profile](https://www.google.com/search?q=https://github.com/Sanjeeb-J)
-
----
