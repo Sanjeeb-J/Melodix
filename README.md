@@ -6,7 +6,7 @@ Here is a professional and detailed `README.md` for the **Melodix** project:
 
 # Melodix 🎵
 
-**Live Demo:** [https://melodix-frontend-murex.vercel.app/](https://www.google.com/search?q=https://melodix-frontend-murex.vercel.app/)
+**Live Demo:** [Melodix.app](https://melodix-frontend-beta.vercel.app/)
 
 **Melodix** is a modern, full-stack music streaming platform that allows users to discover, play, and manage their favorite tracks. Built with a focus on performance and user experience, it brings a sleek interface to high-quality audio streaming.
 
