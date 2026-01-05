@@ -1,7 +1,3 @@
-Based on the repository structure and the title, **Melodix** is a Full-Stack Music Streaming Application. It features a dedicated backend and frontend, designed to provide a seamless music listening experience.
-
-Here is a professional and detailed `README.md` for the **Melodix** project:
-
 ---
 
 # Melodix 🎵
@@ -101,9 +97,3 @@ This project is licensed under the **MIT License**. See the `LICENSE` file for d
 **Sanjeeb J** *Full-Stack Web Developer* [GitHub Profile](https://www.google.com/search?q=https://github.com/Sanjeeb-J)
 
 ---
-
-### How to use this:
-
-1. Create a file named `README.md` in your **Melodix** root folder.
-2. Paste the content above.
-3. If you have specific backend features (like Cloudinary for music storage), feel free to add them under the **Tech Stack** section!
