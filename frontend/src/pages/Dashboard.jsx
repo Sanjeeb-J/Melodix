@@ -40,6 +40,7 @@ import {
   Music2,
   ListMusic,
   Loader2,
+  Menu,
 } from "lucide-react";
 
 // ─── Helpers ───────────────────────────────────────────
@@ -205,12 +206,32 @@ function PlayerBar() {
 }
 
 // ─── Sidebar ───────────────────────────────────────────
-function Sidebar({ view, setView, playlists, onPlaylistClick, onCreatePlaylist, onLogout }) {
+function Sidebar({
+  view,
+  setView,
+  playlists,
+  onPlaylistClick,
+  onCreatePlaylist,
+  onLogout,
+  isOpen,
+  onClose,
+}) {
   return (
-    <aside
-      className="flex flex-col gap-2 h-full overflow-hidden"
-      style={{ width: 240, minWidth: 240, background: "transparent" }}
-    >
+    <>
+      {/* Overlay for mobile */}
+      {isOpen && (
+        <div
+          className="fixed inset-0 bg-black/60 z-40 lg:hidden"
+          onClick={onClose}
+        />
+      )}
+
+      <aside
+        className={`fixed lg:static inset-y-0 left-0 z-50 transform ${
+          isOpen ? "translate-x-0" : "-translate-x-full lg:translate-x-0"
+        } transition-transform duration-300 ease-in-out flex flex-col gap-2 h-full overflow-hidden`}
+        style={{ width: 280, minWidth: 280, background: "black" }}
+      >
       {/* Top Nav */}
       <nav
         className="rounded-lg p-5 flex flex-col gap-6"
@@ -324,6 +345,7 @@ function Sidebar({ view, setView, playlists, onPlaylistClick, onCreatePlaylist, 
         </div>
       </div>
     </aside>
+    </>
   );
 }
 
@@ -1052,21 +1074,6 @@ export default function Dashboard() {
           className="flex-1 rounded-lg overflow-y-auto p-6"
           style={{ background: "#121212" }}
         >
-          {/* Nav buttons */}
-          <div className="flex items-center gap-2 mb-6">
-            <button
-              onClick={() => window.history.back()}
-              className="w-8 h-8 bg-black/50 rounded-full flex items-center justify-center text-white hover:opacity-80 transition-opacity"
-            >
-              <ChevronLeft size={20} />
-            </button>
-            <button
-              onClick={() => window.history.forward()}
-              className="w-8 h-8 bg-black/50 rounded-full flex items-center justify-center text-white hover:opacity-80 transition-opacity"
-            >
-              <ChevronRight size={20} />
-            </button>
-          </div>
 
           {view === "home" && (
             <HomeView

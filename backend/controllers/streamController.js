@@ -35,38 +35,48 @@ const streamAudio = async (req, res) => {
   }
 
   const url = `https://www.youtube.com/watch?v=${videoId}`;
+  console.log(`[Streaming] Request for videoId: ${videoId}`);
 
   try {
     const yt = await getYtDlp();
 
+    // Use a more standard audio MIME type
     res.setHeader("Content-Type", "audio/mpeg");
-    res.setHeader("Transfer-Encoding", "chunked");
-    res.setHeader("Accept-Ranges", "bytes");
+    res.setHeader("Cache-Control", "no-cache");
+    res.setHeader("Connection", "keep-alive");
 
+    // Improved flags for better streaming compatibility
     const stream = yt.execStream([
       url,
-      "-f",
-      "bestaudio[ext=webm]/bestaudio/best",
+      "-f", "bestaudio/best",
       "--no-playlist",
-      "-o",
-      "-",
       "--quiet",
+      "--no-warnings",
+      "-o", "-",
     ]);
+
+    console.log(`[Streaming] Started yt-dlp process for ${videoId}`);
 
     stream.pipe(res);
 
     req.on("close", () => {
+      console.log(`[Streaming] Client closed connection for ${videoId}`);
+      if (stream.ytDlpProcess) stream.ytDlpProcess.kill();
       stream.destroy();
     });
 
     stream.on("error", (err) => {
-      console.error("yt-dlp stream error:", err.message);
+      console.error(`[Streaming] yt-dlp stream error for ${videoId}:`, err.message);
       if (!res.headersSent) {
-        res.status(500).json({ message: "Stream failed" });
+        res.status(500).send("Stream failed");
       }
     });
+
+    stream.on("end", () => {
+      console.log(`[Streaming] Finished streaming ${videoId}`);
+    });
   } catch (err) {
-    console.error("Stream controller error:", err.message);
+    console.error(`[Streaming] Controller error for ${videoId}:`, err.message);
     if (!res.headersSent) {
       res.status(500).json({ message: "Could not start stream" });
     }

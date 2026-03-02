@@ -21,7 +21,7 @@ const protect = async (req, res, next) => {
   }
 
   try {
-    const decoded = jwt.verify(token, process.env.JWT_SECRET || "");
+    const decoded = jwt.verify(token, process.env.JWT_SECRET || "melodix_super_secret_2026");
     req.user = await User.findById(decoded.id).select("-password");
     next();
   } catch (error) {
