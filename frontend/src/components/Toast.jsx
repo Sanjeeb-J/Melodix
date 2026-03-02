@@ -16,9 +16,9 @@ const Toast = ({ message, type = "info", onClose, duration = 3000 }) => {
   };
 
   const colors = {
-    success: "bg-emerald-500/90",
-    error: "bg-red-500/90",
-    info: "bg-indigo-500/90",
+    success: "bg-emerald-600",
+    error: "bg-red-600",
+    info: "bg-primary",
   };
 
   return (
