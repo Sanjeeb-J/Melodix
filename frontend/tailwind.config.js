@@ -4,27 +4,23 @@ export default {
   theme: {
     extend: {
       colors: {
-        main: "var(--bg-main)",
-        sidebar: "var(--bg-sidebar)",
-        card: "var(--bg-card)",
-        "card-hover": "var(--bg-card-hover)",
-        primary: "var(--color-primary)",
-        "primary-hover": "var(--color-primary-hover)",
-        dim: "var(--text-dim)",
-        muted: "var(--text-muted)",
-        subtle: "var(--border-subtle)",
-        glass: "var(--glass-bg)",
-      },
-      textColor: {
-        main: "var(--text-main)",
-        dim: "var(--text-dim)",
-        muted: "var(--text-muted)",
-      },
-      borderColor: {
-        subtle: "var(--border-subtle)",
+        "sp-black": "#000000",
+        "sp-dark": "#121212",
+        "sp-surface": "#181818",
+        "sp-elevated": "#242424",
+        "sp-hover": "#282828",
+        "sp-border": "rgba(255,255,255,0.05)",
+        "sp-text": "#ffffff",
+        "sp-dim": "#b3b3b3",
+        "sp-muted": "#6a6a6a",
+        "sp-green": "#1db954",
+        "sp-green-h": "#1ed760",
       },
       fontFamily: {
         sans: ["Inter", "system-ui", "sans-serif"],
+      },
+      height: {
+        player: "90px",
       },
     },
   },

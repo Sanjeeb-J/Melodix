@@ -1,4 +1,5 @@
 import { createContext, useContext, useRef, useState, useEffect, useCallback } from "react";
+import { getStreamUrl } from "../services/streamService";
 
 const PlayerContext = createContext();
 
@@ -15,13 +16,7 @@ export const PlayerProvider = ({ children }) => {
   const [duration, setDuration] = useState(0);
   const [currentTime, setCurrentTime] = useState(0);
   const [isLoading, setIsLoading] = useState(false);
-  const API_URL = import.meta.env.VITE_API_URL;
 
-  // Build audio src from videoId using backend stream route
-  const getStreamUrl = (videoId) => {
-    const token = localStorage.getItem("token");
-    return `${API_URL}/api/stream/${videoId}?token=${token}`;
-  };
 
   // Play a song, optionally with a queue context
   const playSong = useCallback((song, newQueue = null, index = 0) => {

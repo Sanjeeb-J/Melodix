@@ -4,28 +4,28 @@ const User = require("../models/User");
 const protect = async (req, res, next) => {
   let token;
 
-  // Check for token in headers
+  // Check Authorization header first (standard API calls)
   if (
     req.headers.authorization &&
     req.headers.authorization.startsWith("Bearer")
   ) {
-    try {
-      token = req.headers.authorization.split(" ")[1];
-
-      // Verify token
-      const decoded = jwt.verify(token, "supersecretkey");
-
-      // Attach user to request (without password)
-      req.user = await User.findById(decoded.id).select("-password");
-
-      next();
-    } catch (error) {
-      return res.status(401).json({ message: "Not authorized, token failed" });
-    }
+    token = req.headers.authorization.split(" ")[1];
+  }
+  // Fallback: check query param (used by <audio src> streaming)
+  else if (req.query.token) {
+    token = req.query.token;
   }
 
   if (!token) {
     return res.status(401).json({ message: "Not authorized, no token" });
+  }
+
+  try {
+    const decoded = jwt.verify(token, process.env.JWT_SECRET || "supersecretkey");
+    req.user = await User.findById(decoded.id).select("-password");
+    next();
+  } catch (error) {
+    return res.status(401).json({ message: "Not authorized, token failed" });
   }
 };
 
