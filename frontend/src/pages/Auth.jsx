@@ -11,7 +11,10 @@ import {
   Loader2,
   CheckCircle2,
   Music,
+  Moon,
+  Sun,
 } from "lucide-react";
+import { useTheme } from "../context/ThemeContext";
 
 // Reusable Input Component
 const InputField = ({
@@ -59,6 +62,7 @@ function Auth() {
   const [isLogin, setIsLogin] = useState(true);
   const [showPassword, setShowPassword] = useState(false);
   const [status, setStatus] = useState("idle");
+  const { isDarkMode, toggleTheme } = useTheme();
   const navigate = useNavigate();
 
   const [loginData, setLoginData] = useState({
@@ -112,6 +116,16 @@ function Auth() {
 
   return (
     <div className="auth-wrapper">
+      <div className="auth-bg" />
+      
+      {/* Theme Toggle */}
+      <button 
+        onClick={toggleTheme}
+        className="fixed top-6 right-6 p-3 rounded-xl bg-white/10 backdrop-blur-md border border-white/10 text-white hover:bg-white/20 transition-all z-50"
+      >
+        {isDarkMode ? <Sun size={20} /> : <Moon size={20} />}
+      </button>
+
       <div className="auth-container entrance-anim">
         <div className="glass-morphism">
           <div className="auth-content">

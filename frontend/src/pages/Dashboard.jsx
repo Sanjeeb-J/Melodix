@@ -13,7 +13,8 @@ import { searchYouTube } from "../services/youtubeService";
 import { useToast } from "../components/ToastContainer";
 import EditModal from "../components/EditModal";
 import { getPlaylistCover } from "../utils/playlistCover";
-import { Edit2, Clock } from "lucide-react";
+import { Edit2, Clock, Moon, Sun } from "lucide-react";
+import { useTheme } from "../context/ThemeContext";
 
 function Dashboard() {
   const [searchQuery, setSearchQuery] = useState("");
@@ -39,6 +40,7 @@ function Dashboard() {
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [showCreatePlaylist, setShowCreatePlaylist] = useState(false);
   const [newPlaylistName, setNewPlaylistName] = useState("");
+  const { isDarkMode, toggleTheme } = useTheme();
 
   const navigate = useNavigate();
   const { showToast } = useToast();
@@ -258,14 +260,14 @@ function Dashboard() {
   }
 
   return (
-    <div className="h-screen w-full flex flex-col bg-black text-white selection:bg-indigo-500/50 relative overflow-hidden">
+    <div className="h-screen w-full flex flex-col bg-[var(--background)] text-[var(--foreground)] selection:bg-[var(--primary)]/30 relative overflow-hidden transition-colors duration-300">
       {/* Background decoration */}
-      <div className="absolute top-0 left-0 w-full h-full pointer-events-none opacity-30">
-        <div className="absolute top-0 right-0 w-1/2 h-1/2 bg-indigo-900/10 blur-[150px] rounded-full"></div>
-        <div className="absolute bottom-0 left-0 w-1/2 h-1/2 bg-purple-900/10 blur-[150px] rounded-full"></div>
+      <div className="absolute top-0 left-0 w-full h-full pointer-events-none opacity-20">
+        <div className="absolute top-0 right-0 w-1/2 h-1/2 bg-[var(--primary)]/10 blur-[150px] rounded-full"></div>
+        <div className="absolute bottom-0 left-0 w-1/2 h-1/2 bg-[var(--primary)]/5 blur-[150px] rounded-full"></div>
       </div>
 
-      <div className="flex-1 w-full flex overflow-hidden relative z-10">
+      <div className="flex-1 w-full flex overflow-hidden relative z-10 transition-colors duration-300">
         {/* Mobile Menu Overlay */}
         {isMobileMenuOpen && (
           <div
@@ -395,23 +397,21 @@ function Dashboard() {
         )}
 
         {/* Desktop Sidebar */}
-        <div className="hidden md:flex w-64 bg-black h-full flex-col p-6 space-y-8 border-r border-zinc-900">
-          <div className="flex items-center space-x-2 text-indigo-500 font-bold text-2xl">
-            <div className="bg-indigo-600/10 p-1.5 rounded-lg">
-              <svg
-                width="28"
-                height="28"
-                viewBox="0 0 24 24"
-                fill="none"
-                stroke="currentColor"
-                strokeWidth="2.5"
-              >
-                <path d="M9 18V5l12-2v13" />
-                <circle cx="6" cy="18" r="3" />
-                <circle cx="18" cy="16" r="3" />
-              </svg>
+        <div className="hidden md:flex w-64 bg-[var(--background)] h-full flex-col p-6 space-y-8 border-r border-[var(--border)]">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center space-x-2 text-[var(--primary)] font-bold text-2xl">
+              <div className="bg-[var(--primary)]/10 p-1.5 rounded-lg">
+                <Music size={28} strokeWidth={2.5} />
+              </div>
+              <span>Melodix</span>
             </div>
-            <span>Melodix</span>
+            {/* Theme Toggle Button */}
+            <button 
+              onClick={toggleTheme}
+              className="p-2 rounded-lg bg-[var(--accent)] text-[var(--foreground)] hover:bg-[var(--accent)]/80 transition-all"
+            >
+              {isDarkMode ? <Sun size={18} /> : <Moon size={18} />}
+            </button>
           </div>
 
           <nav className="space-y-1">
@@ -419,8 +419,8 @@ function Dashboard() {
               onClick={() => setCurrentView("home")}
               className={`flex items-center space-x-4 w-full px-4 py-3 rounded-xl transition-all ${
                 currentView === "home"
-                  ? "bg-white/10 text-white"
-                  : "text-zinc-400 hover:text-white"
+                  ? "bg-[var(--primary)] text-[var(--primary-foreground)]"
+                  : "text-[var(--muted-foreground)] hover:text-[var(--foreground)] hover:bg-[var(--accent)]"
               }`}
             >
               <svg
@@ -440,8 +440,8 @@ function Dashboard() {
               onClick={() => setCurrentView("library")}
               className={`flex items-center space-x-4 w-full px-4 py-3 rounded-xl transition-all ${
                 currentView === "library"
-                  ? "bg-white/10 text-white"
-                  : "text-zinc-400 hover:text-white"
+                  ? "bg-[var(--primary)] text-[var(--primary-foreground)]"
+                  : "text-[var(--muted-foreground)] hover:text-[var(--foreground)] hover:bg-[var(--accent)]"
               }`}
             >
               <svg
@@ -462,7 +462,7 @@ function Dashboard() {
 
           <div className="flex-1 flex flex-col overflow-hidden">
             <div className="flex items-center justify-between mb-4">
-              <span className="text-xs font-bold text-zinc-500 uppercase">
+              <span className="text-xs font-bold text-[var(--muted-foreground)] uppercase">
                 Playlists
               </span>
               <button
@@ -470,7 +470,7 @@ function Dashboard() {
                   setNewPlaylist("New Mix");
                   handleCreatePlaylist();
                 }}
-                className="text-zinc-500 hover:text-white p-1 bg-zinc-900 rounded-md"
+                className="text-[var(--muted-foreground)] hover:text-[var(--foreground)] p-1 bg-[var(--accent)] rounded-md"
               >
                 <svg
                   width="16"
@@ -491,7 +491,11 @@ function Dashboard() {
                 <div key={p._id} className="group flex items-center">
                   <button
                     onClick={() => handlePlaylistSelect(p)}
-                    className="flex-1 text-left px-4 py-2.5 text-zinc-400 hover:text-white hover:bg-white/5 rounded-lg transition-all text-sm truncate"
+                    className={`flex-1 text-left px-4 py-2.5 rounded-lg transition-all text-sm truncate ${
+                      selectedPlaylist?._id === p._id
+                        ? "bg-[var(--primary)]/10 text-[var(--primary)] font-bold"
+                        : "text-[var(--muted-foreground)] hover:text-[var(--foreground)] hover:bg-[var(--accent)]"
+                    }`}
                   >
                     {p.name}
                   </button>
@@ -525,12 +529,12 @@ function Dashboard() {
           </button>
         </div>
 
-        <main className="flex-1 w-full overflow-y-auto bg-gradient-to-b from-transparent to-black p-4 md:p-8">
+        <main className="flex-1 w-full overflow-y-auto bg-[var(--background)] p-4 md:p-8 transition-colors duration-300">
           {/* Mobile Header */}
-          <header className="flex md:hidden items-center justify-between mb-6 sticky top-0 bg-black/50 backdrop-blur-md -mx-4 px-4 py-3 z-40 border-b border-white/5">
+          <header className="flex md:hidden items-center justify-between mb-6 sticky top-0 bg-[var(--background)]/80 backdrop-blur-md -mx-4 px-4 py-3 z-40 border-b border-[var(--border)]">
             <button
               onClick={() => setIsMobileMenuOpen(true)}
-              className="p-2 text-zinc-400"
+              className="p-2 text-[var(--muted-foreground)]"
             >
               <svg
                 width="24"
@@ -545,61 +549,59 @@ function Dashboard() {
                 <line x1="3" y1="18" x2="21" y2="18" />
               </svg>
             </button>
-            <div className="flex items-center space-x-2 text-indigo-500 font-black text-xl">
-              <svg
-                width="24"
-                height="24"
-                viewBox="0 0 24 24"
-                fill="none"
-                stroke="currentColor"
-                strokeWidth="2.5"
-              >
-                <path d="M9 18V5l12-2v13" />
-                <circle cx="6" cy="18" r="3" />
-                <circle cx="18" cy="16" r="3" />
-              </svg>
+            <div className="flex items-center space-x-2 text-[var(--primary)] font-black text-xl">
+              <Music size={24} />
               <span>Melodix</span>
             </div>
-            <button
-              onClick={() => setIsSearchOpen(true)}
-              className="p-2 text-zinc-400"
-            >
-              <svg
-                width="24"
-                height="24"
-                viewBox="0 0 24 24"
-                fill="none"
-                stroke="currentColor"
-                strokeWidth="2.5"
+            <div className="flex items-center space-x-1">
+              {/* Mobile Theme Toggle */}
+              <button 
+                onClick={toggleTheme}
+                className="p-2 text-[var(--muted-foreground)] hover:text-[var(--foreground)]"
               >
-                <circle cx="11" cy="11" r="8" />
-                <path d="m21 21-4.3-4.3" />
-              </svg>
-            </button>
+                {isDarkMode ? <Sun size={20} /> : <Moon size={20} />}
+              </button>
+              <button
+                onClick={() => setIsSearchOpen(true)}
+                className="p-2 text-[var(--muted-foreground)] hover:text-[var(--foreground)]"
+              >
+                <svg
+                  width="24"
+                  height="24"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="2.5"
+                >
+                  <circle cx="11" cy="11" r="8" />
+                  <path d="m21 21-4.3-4.3" />
+                </svg>
+              </button>
+            </div>
           </header>
 
           {/* Home View */}
           {currentView === "home" && (
             <div className="space-y-12">
-              <section className="bg-gradient-to-br from-indigo-600/20 via-purple-600/5 to-transparent p-8 md:p-16 rounded-3xl border border-white/5">
-                <h2 className="text-4xl md:text-7xl font-black mb-6 tracking-tighter">
+              <section className="bg-gradient-to-br from-[var(--primary)]/20 via-[var(--primary)]/5 to-transparent p-8 md:p-16 rounded-3xl border border-[var(--border)] shadow-sm">
+                <h2 className="text-4xl md:text-7xl font-black mb-6 tracking-tighter text-[var(--foreground)]">
                   Rediscover Your
                   <br />
-                  <span className="text-zinc-500">Music Taste.</span>
+                  <span className="text-[var(--muted-foreground)] opacity-70">Music Taste.</span>
                 </h2>
-                <p className="text-zinc-400 text-lg mb-10 max-w-2xl">
+                <p className="text-[var(--muted-foreground)] text-lg mb-10 max-w-2xl">
                   Your personalized music library with YouTube integration.
                 </p>
                 <div className="flex flex-col sm:flex-row gap-4">
                   <button
                     onClick={() => setShowCreatePlaylist(true)}
-                    className="bg-white text-black font-black px-10 py-4 rounded-full hover:scale-105 transition-all"
+                    className="bg-[var(--foreground)] text-[var(--background)] font-black px-10 py-4 rounded-full hover:scale-105 transition-all shadow-lg"
                   >
                     Create New Mix
                   </button>
                   <button
                     onClick={() => setCurrentView("library")}
-                    className="bg-white/5 teCreate New Mixxt-white font-black px-10 py-4 rounded-full border border-white/10 hover:bg-white/10 transition-all"
+                    className="bg-[var(--accent)] text-[var(--foreground)] font-black px-10 py-4 rounded-full border border-[var(--border)] hover:bg-[var(--accent)]/80 transition-all"
                   >
                     Explore Library
                   </button>
@@ -662,7 +664,7 @@ function Dashboard() {
                   <div
                     key={p._id}
                     onClick={() => handlePlaylistSelect(p)}
-                    className="bg-zinc-900/30 p-4 rounded-3xl hover:bg-zinc-800 transition-all cursor-pointer group"
+                    className="bg-[var(--card)] p-4 rounded-3xl hover:bg-[var(--accent)] transition-all cursor-pointer group border border-[var(--border)]"
                   >
                     <div className="aspect-square rounded-2xl overflow-hidden">
                       {p.songs?.length > 0 ? (
@@ -680,8 +682,8 @@ function Dashboard() {
                       )}
                     </div>
 
-                    <h4 className="font-black truncate mb-2">{p.name}</h4>
-                    <span className="text-xs text-zinc-600 font-black uppercase">
+                    <h4 className="font-black truncate mb-2 text-[var(--foreground)]">{p.name}</h4>
+                    <span className="text-xs text-[var(--muted-foreground)] font-black uppercase">
                       {p.songs?.length || 0} items
                     </span>
                   </div>
@@ -714,29 +716,29 @@ function Dashboard() {
                 </div>
 
                 <div className="flex-1 text-center md:text-left">
-                  <span className="bg-indigo-600 text-white text-xs font-black px-3 py-1 rounded-lg">
+                  <span className="bg-[var(--primary)] text-[var(--primary-foreground)] text-xs font-black px-3 py-1 rounded-lg">
                     Private Mix
                   </span>
                   <div className="flex items-center justify-center md:justify-start gap-4 mt-6 mb-4">
-                    <h1 className="text-4xl md:text-8xl font-black">
+                    <h1 className="text-4xl md:text-8xl font-black text-[var(--foreground)]">
                       {selectedPlaylist.name}
                     </h1>
                     <button
                       onClick={() => handleEditPlaylist(selectedPlaylist)}
-                      className="p-3 hover:bg-white/10 rounded-xl transition-all"
+                      className="p-3 hover:bg-[var(--accent)] rounded-xl transition-all"
                     >
                       <Edit2
                         size={28}
-                        className="text-zinc-400 hover:text-white"
+                        className="text-[var(--muted-foreground)] hover:text-[var(--foreground)]"
                       />
                     </button>
                   </div>
-                  <p className="text-zinc-400 text-lg mb-10">
+                  <p className="text-[var(--muted-foreground)] text-lg mb-10">
                     {selectedPlaylist.songs?.length || 0} tracks
                   </p>
                   <div className="flex items-center justify-center md:justify-start space-x-4">
                     {/* Play Button */}
-                    <button className="w-16 h-16 bg-white rounded-full flex items-center justify-center hover:scale-110 transition-all text-black">
+                    <button className="w-16 h-16 bg-[var(--foreground)] rounded-full flex items-center justify-center hover:scale-110 transition-all text-[var(--background)] shadow-xl">
                       <svg
                         width="24"
                         height="24"
@@ -751,7 +753,7 @@ function Dashboard() {
                     {/* DELETE PLAYLIST BUTTON */}
                     <button
                       onClick={() => setShowDeleteConfirm(true)}
-                      className="bg-red-600/90 hover:bg-red-600 px-8 py-4 rounded-3xl font-black transition-all"
+                      className="bg-[var(--destructive)] hover:bg-[var(--destructive)]/90 text-[var(--destructive-foreground)] px-8 py-4 rounded-3xl font-black transition-all shadow-md"
                     >
                       Delete
                     </button>
@@ -759,7 +761,7 @@ function Dashboard() {
                     {/* ADD SONG BUTTON */}
                     <button
                       onClick={() => setIsSearchOpen(true)}
-                      className="bg-indigo-600 hover:bg-indigo-500 px-10 py-4 rounded-3xl font-black flex items-center space-x-4 transition-all"
+                      className="bg-[var(--primary)] hover:bg-[var(--primary)]/90 text-[var(--primary-foreground)] px-10 py-4 rounded-3xl font-black flex items-center space-x-4 transition-all shadow-lg"
                     >
                       <span>+ Add Songs</span>
                     </button>
@@ -767,25 +769,25 @@ function Dashboard() {
                 </div>
               </div>
 
-              <div className="bg-zinc-900/20 rounded-3xl overflow-hidden border border-white/5">
+              <div className="bg-[var(--card)] rounded-3xl overflow-hidden border border-[var(--border)] shadow-sm">
                 {!selectedPlaylist.songs ||
                 selectedPlaylist.songs.length === 0 ? (
                   <div className="py-40 text-center">
-                    <p className="text-4xl font-black mb-4">Silent Mix</p>
-                    <p className="text-zinc-500 mb-10">
+                    <p className="text-4xl font-black mb-4 text-[var(--foreground)]">Silent Mix</p>
+                    <p className="text-[var(--muted-foreground)] mb-10">
                       Add some tracks to bring this collection to life.
                     </p>
                     <button
                       onClick={() => setIsSearchOpen(true)}
-                      className="bg-white text-black font-black px-14 py-5 rounded-full"
+                      className="bg-[var(--foreground)] text-[var(--background)] font-black px-14 py-5 rounded-full hover:scale-105 transition-all shadow-lg"
                     >
                       Find Music
                     </button>
                   </div>
                 ) : (
-                  <div className="divide-y divide-white/5">
+                  <div className="divide-y divide-[var(--border)]">
                     {/* Table Header */}
-                    <div className="flex items-center p-5 text-zinc-500 text-xs font-bold uppercase border-b border-white/10">
+                    <div className="flex items-center p-5 text-[var(--muted-foreground)] text-xs font-bold uppercase border-b border-[var(--border)]">
                       <span className="w-12">#</span>
                       <span className="flex-1">Title</span>
                       <span className="w-32 hidden lg:block">Artist</span>
@@ -800,9 +802,9 @@ function Dashboard() {
                       <div
                         key={song._id}
                         onClick={() => playSong(song)}
-                        className="flex items-center p-5 hover:bg-white/5 transition-all cursor-pointer group"
+                        className="flex items-center p-5 hover:bg-[var(--accent)] transition-all cursor-pointer group"
                       >
-                        <span className="w-12 text-zinc-600 font-mono text-sm">
+                        <span className="w-12 text-[var(--muted-foreground)] font-mono text-sm">
                           {index + 1}
                         </span>
                         <div className="flex items-center space-x-5 flex-1 min-w-0">
@@ -817,19 +819,19 @@ function Dashboard() {
                               target="_blank"
                               rel="noopener noreferrer"
                               onClick={(e) => e.stopPropagation()}
-                              className="font-bold text-base truncate block group-hover:text-indigo-400"
+                              className="font-bold text-base truncate block group-hover:text-[var(--primary)]"
                             >
                               {song.name}
                             </a>
-                            <span className="text-xs text-zinc-500 font-semibold truncate block lg:hidden">
+                            <span className="text-xs text-[var(--muted-foreground)] font-semibold truncate block lg:hidden">
                               {song.artist}
                             </span>
                           </div>
                         </div>
-                        <span className="w-32 text-sm text-zinc-400 truncate hidden lg:block">
+                        <span className="w-32 text-sm text-[var(--muted-foreground)] truncate hidden lg:block">
                           {song.artist}
                         </span>
-                        <span className="w-24 text-zinc-500 text-sm font-mono hidden md:block">
+                        <span className="w-24 text-[var(--muted-foreground)] text-sm font-mono hidden md:block">
                           {song.duration}
                         </span>
                         <div className="w-32 flex items-center justify-end gap-2">
@@ -838,7 +840,7 @@ function Dashboard() {
                               e.stopPropagation();
                               handleEditSong(song);
                             }}
-                            className="opacity-100 md:opacity-0 md:group-hover:opacity-100 p-2 text-zinc-600 hover:text-indigo-400 transition-all"
+                            className="opacity-100 md:opacity-0 md:group-hover:opacity-100 p-2 text-[var(--muted-foreground)] hover:text-[var(--primary)] transition-all"
                           >
                             <Edit2 size={16} />
                           </button>
@@ -848,7 +850,7 @@ function Dashboard() {
                               e.stopPropagation();
                               handleDeleteSong(selectedPlaylist._id, song._id);
                             }}
-                            className="opacity-100 md:opacity-0 md:group-hover:opacity-100 p-2 text-zinc-600 hover:text-red-500 transition-all"
+                            className="opacity-100 md:opacity-0 md:group-hover:opacity-100 p-2 text-[var(--muted-foreground)] hover:text-[var(--destructive)] transition-all"
                           >
                             <svg
                               width="18"
@@ -876,11 +878,11 @@ function Dashboard() {
 
       {/* Search Modal */}
       {isSearchOpen && (
-        <div className="fixed inset-0 z-[100] bg-black/90 backdrop-blur-xl flex items-center justify-center p-4">
-          <div className="bg-zinc-950 w-full max-w-4xl max-h-[85vh] rounded-3xl border border-white/5 overflow-hidden flex flex-col">
-            <div className="p-8 border-b border-white/5 flex items-center space-x-4">
+        <div className="fixed inset-0 z-[100] bg-black/60 backdrop-blur-sm flex items-center justify-center p-4">
+          <div className="bg-[var(--card)] w-full max-w-4xl max-h-[85vh] rounded-3xl border border-[var(--border)] overflow-hidden flex flex-col shadow-2xl">
+            <div className="p-8 border-b border-[var(--border)] flex items-center space-x-4">
               <svg
-                className="text-zinc-500"
+                className="text-[var(--muted-foreground)]"
                 width="28"
                 height="28"
                 viewBox="0 0 24 24"
@@ -895,14 +897,14 @@ function Dashboard() {
                 autoFocus
                 type="text"
                 placeholder="Search YouTube..."
-                className="bg-transparent border-none outline-none text-white w-full text-3xl font-black"
+                className="bg-transparent border-none outline-none text-[var(--foreground)] w-full text-3xl font-black placeholder:text-[var(--muted-foreground)]/50"
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
                 onKeyDown={(e) => e.key === "Enter" && handleSearch()}
               />
               <button
                 onClick={() => setIsSearchOpen(false)}
-                className="text-zinc-500 hover:text-white p-2"
+                className="text-[var(--muted-foreground)] hover:text-[var(--foreground)] p-2"
               >
                 <svg
                   width="32"
@@ -918,11 +920,11 @@ function Dashboard() {
               </button>
             </div>
 
-            <div className="flex-1 overflow-y-auto p-8">
+            <div className="flex-1 overflow-y-auto p-8 bg-[var(--background)]">
               {searchLoading && (
                 <div className="flex flex-col items-center py-32">
-                  <div className="w-16 h-16 border-4 border-indigo-500 border-t-transparent rounded-full animate-spin"></div>
-                  <p className="text-zinc-500 mt-6 font-black">Searching...</p>
+                  <div className="w-16 h-16 border-4 border-[var(--primary)] border-t-transparent rounded-full animate-spin"></div>
+                  <p className="text-[var(--muted-foreground)] mt-6 font-black">Searching...</p>
                 </div>
               )}
 
@@ -931,7 +933,7 @@ function Dashboard() {
                   {searchResults.map((song) => (
                     <div
                       key={song.videoId}
-                      className="flex items-center justify-between p-5 hover:bg-white/5 bg-white/[0.02] border border-white/5 rounded-3xl transition-all cursor-pointer"
+                      className="flex items-center justify-between p-5 hover:bg-[var(--accent)] bg-[var(--card)] border border-[var(--border)] rounded-3xl transition-all cursor-pointer group"
                       onClick={() => handleAddSong(song)}
                     >
                       <div className="flex items-center space-x-5 min-w-0">
@@ -945,19 +947,19 @@ function Dashboard() {
                         />
 
                         <div className="min-w-0">
-                          <h4 className="text-white font-bold text-xl truncate">
+                          <h4 className="text-[var(--foreground)] font-bold text-xl truncate group-hover:text-[var(--primary)]">
                             {song.title}
                           </h4>
-                          <p className="text-xs text-zinc-500 font-black uppercase truncate">
+                          <p className="text-xs text-[var(--muted-foreground)] font-black uppercase truncate">
                             {song.artist}
                           </p>
 
-                          <p className="text-xs text-zinc-400 font-mono mt-1">
+                        <p className="text-xs text-[var(--muted-foreground)] font-mono mt-1 opacity-70">
                             {song.duration}
                           </p>
                         </div>
                       </div>
-                      <button className="bg-white text-black font-black px-6 py-3 rounded-full text-sm">
+                      <button className="bg-[var(--primary)] text-[var(--primary-foreground)] font-black px-6 py-3 rounded-full text-sm hover:scale-105 transition-all">
                         Add
                       </button>
                     </div>
@@ -977,14 +979,14 @@ function Dashboard() {
         title="Edit Playlist"
       >
         <div className="space-y-2">
-          <label className="text-sm font-semibold text-zinc-400 uppercase tracking-wider">
+          <label className="text-sm font-semibold text-[var(--muted-foreground)] uppercase tracking-wider">
             Playlist Name
           </label>
           <input
             type="text"
             value={editingPlaylistName}
             onChange={(e) => setEditingPlaylistName(e.target.value)}
-            className="w-full bg-zinc-900/50 border border-white/10 rounded-xl px-4 py-3 text-white outline-none focus:border-indigo-500 transition-all"
+            className="w-full bg-[var(--input)] border border-[var(--border)] rounded-xl px-4 py-3 text-[var(--foreground)] outline-none focus:border-[var(--primary)] transition-all"
             placeholder="Enter playlist name"
           />
         </div>
@@ -999,7 +1001,7 @@ function Dashboard() {
       >
         <div className="space-y-4">
           <div className="space-y-2">
-            <label className="text-sm font-semibold text-zinc-400 uppercase tracking-wider">
+            <label className="text-sm font-semibold text-[var(--muted-foreground)] uppercase tracking-wider">
               Song Name
             </label>
             <input
@@ -1008,12 +1010,12 @@ function Dashboard() {
               onChange={(e) =>
                 setEditingSongData({ ...editingSongData, name: e.target.value })
               }
-              className="w-full bg-zinc-900/50 border border-white/10 rounded-xl px-4 py-3 text-white outline-none focus:border-indigo-500 transition-all"
+              className="w-full bg-[var(--input)] border border-[var(--border)] rounded-xl px-4 py-3 text-[var(--foreground)] outline-none focus:border-[var(--primary)] transition-all"
               placeholder="Enter song name"
             />
           </div>
           <div className="space-y-2">
-            <label className="text-sm font-semibold text-zinc-400 uppercase tracking-wider">
+            <label className="text-sm font-semibold text-[var(--muted-foreground)] uppercase tracking-wider">
               Artist
             </label>
             <input
@@ -1025,12 +1027,12 @@ function Dashboard() {
                   artist: e.target.value,
                 })
               }
-              className="w-full bg-zinc-900/50 border border-white/10 rounded-xl px-4 py-3 text-white outline-none focus:border-indigo-500 transition-all"
+              className="w-full bg-[var(--input)] border border-[var(--border)] rounded-xl px-4 py-3 text-[var(--foreground)] outline-none focus:border-[var(--primary)] transition-all"
               placeholder="Enter artist name"
             />
           </div>
           <div className="space-y-2">
-            <label className="text-sm font-semibold text-zinc-400 uppercase tracking-wider">
+            <label className="text-sm font-semibold text-[var(--muted-foreground)] uppercase tracking-wider">
               Duration
             </label>
             <input
@@ -1042,17 +1044,17 @@ function Dashboard() {
                   duration: e.target.value,
                 })
               }
-              className="w-full bg-zinc-900/50 border border-white/10 rounded-xl px-4 py-3 text-white outline-none focus:border-indigo-500 transition-all"
+              className="w-full bg-[var(--input)] border border-[var(--border)] rounded-xl px-4 py-3 text-[var(--foreground)] outline-none focus:border-[var(--primary)] transition-all"
               placeholder="e.g., 3:45"
             />
           </div>
         </div>
       </EditModal>
       {showDeleteConfirm && (
-        <div className="fixed inset-0 z-[200] bg-black/80 backdrop-blur-sm flex items-center justify-center">
-          <div className="bg-zinc-950 rounded-3xl p-8 w-full max-w-md border border-white/10">
-            <h3 className="text-2xl font-black mb-4">Delete Playlist</h3>
-            <p className="text-zinc-400 mb-8">
+        <div className="fixed inset-0 z-[200] bg-black/60 backdrop-blur-sm flex items-center justify-center p-4">
+          <div className="bg-[var(--card)] rounded-3xl p-8 w-full max-w-md border border-[var(--border)] shadow-2xl">
+            <h3 className="text-2xl font-black mb-4 text-[var(--foreground)]">Delete Playlist</h3>
+            <p className="text-[var(--muted-foreground)] mb-8">
               Are you sure you want to delete this playlist? This action cannot
               be undone.
             </p>
@@ -1060,7 +1062,7 @@ function Dashboard() {
             <div className="flex justify-end space-x-4">
               <button
                 onClick={() => setShowDeleteConfirm(false)}
-                className="px-6 py-3 rounded-xl bg-white/5 hover:bg-white/10 font-bold transition-all"
+                className="px-6 py-3 rounded-xl bg-[var(--secondary)] hover:bg-[var(--secondary)]/80 text-[var(--secondary-foreground)] font-bold transition-all"
               >
                 Cancel
               </button>
@@ -1072,7 +1074,7 @@ function Dashboard() {
                   setCurrentView("home");
                   setSelectedPlaylist(null);
                 }}
-                className="px-6 py-3 rounded-xl bg-red-600 hover:bg-red-500 font-bold transition-all"
+                className="px-6 py-3 rounded-xl bg-[var(--destructive)] hover:bg-[var(--destructive)]/90 text-[var(--destructive-foreground)] font-bold transition-all"
               >
                 Delete
               </button>
@@ -1081,16 +1083,16 @@ function Dashboard() {
         </div>
       )}
       {showCreatePlaylist && (
-        <div className="fixed inset-0 z-[200] bg-black/80 backdrop-blur-sm flex items-center justify-center">
-          <div className="bg-zinc-950 rounded-3xl p-8 w-full max-w-md border border-white/10">
-            <h3 className="text-2xl font-black mb-4">Create New Playlist</h3>
+        <div className="fixed inset-0 z-[200] bg-black/60 backdrop-blur-sm flex items-center justify-center p-4">
+          <div className="bg-[var(--card)] rounded-3xl p-8 w-full max-w-md border border-[var(--border)] shadow-2xl">
+            <h3 className="text-2xl font-black mb-4 text-[var(--foreground)]">Create New Playlist</h3>
 
             <input
               type="text"
               placeholder="Playlist name"
               value={newPlaylistName}
               onChange={(e) => setNewPlaylistName(e.target.value)}
-              className="w-full bg-zinc-900 border border-white/10 rounded-xl px-4 py-3 text-white outline-none focus:border-indigo-500 mb-6"
+              className="w-full bg-[var(--input)] border border-[var(--border)] rounded-xl px-4 py-3 text-[var(--foreground)] outline-none focus:border-[var(--primary)] mb-6"
               autoFocus
             />
 
@@ -1100,26 +1102,23 @@ function Dashboard() {
                   setShowCreatePlaylist(false);
                   setNewPlaylistName("");
                 }}
-                className="px-6 py-3 rounded-xl bg-white/5 hover:bg-white/10 font-bold transition-all"
+                className="px-6 py-3 rounded-xl bg-[var(--secondary)] hover:bg-[var(--secondary)]/80 text-[var(--secondary-foreground)] font-bold transition-all"
               >
                 Cancel
               </button>
 
-              <button
-                onClick={async () => {
-                  if (!newPlaylistName.trim()) return;
+                  <button
+                    onClick={async () => {
+                      if (!newPlaylistName.trim()) return;
 
-                  await handleCreatePlaylist(newPlaylistName);
-                  setShowCreatePlaylist(false);
-                  setNewPlaylistName("");
-
-                  setShowCreatePlaylist(false);
-                  setNewPlaylistName("");
-                }}
-                className="px-6 py-3 rounded-xl bg-indigo-600 hover:bg-indigo-500 font-bold transition-all"
-              >
-                Create
-              </button>
+                      await handleCreatePlaylist(newPlaylistName);
+                      setShowCreatePlaylist(false);
+                      setNewPlaylistName("");
+                    }}
+                    className="px-6 py-3 rounded-xl bg-[var(--primary)] hover:bg-[var(--primary)]/90 text-[var(--primary-foreground)] font-bold transition-all"
+                  >
+                    Create
+                  </button>
             </div>
           </div>
         </div>
