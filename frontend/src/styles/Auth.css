@@ -9,27 +9,18 @@
 
 /* Custom Mesh Gradient with Animation */
 body {
-  background: var(--background);
+  background: radial-gradient(circle at 0% 0%, #1e1b4b 0%, transparent 50%),
+    radial-gradient(circle at 100% 100%, #312e81 0%, transparent 50%),
+    radial-gradient(circle at 100% 0%, #4c1d95 0%, transparent 50%),
+    radial-gradient(circle at 0% 100%, #1e293b 0%, transparent 50%), #020617;
+  background-attachment: fixed;
+  animation: bgPulse 20s ease-in-out infinite alternate;
   min-height: 100vh;
   display: flex;
   align-items: center;
   justify-content: center;
   position: relative;
   overflow: hidden;
-}
-
-.auth-bg {
-  position: absolute;
-  inset: 0;
-  background-image: url('/auth-bg.png');
-  background-size: cover;
-  background-position: center;
-  filter: blur(8px) brightness(0.6);
-  z-index: -1;
-}
-
-.light .auth-bg {
-  filter: blur(8px) brightness(0.9) saturate(1.2);
 }
 
 @keyframes bgPulse {
@@ -41,7 +32,32 @@ body {
   }
 }
 
-/* Removed old background blobs */
+/* Background decoration */
+body::before,
+body::after {
+  content: "";
+  position: absolute;
+  border-radius: 50%;
+  filter: blur(150px);
+  opacity: 0.15;
+  pointer-events: none;
+}
+
+body::before {
+  top: -20%;
+  left: -20%;
+  width: 80%;
+  height: 80%;
+  background: #6366f1;
+}
+
+body::after {
+  bottom: -20%;
+  right: -20%;
+  width: 80%;
+  height: 80%;
+  background: #8b5cf6;
+}
 
 .auth-wrapper {
   min-height: 100vh;
@@ -62,18 +78,14 @@ body {
 
 /* Glass Morphism */
 .glass-morphism {
-  background: var(--card);
+  background: rgba(15, 23, 42, 0.6);
   backdrop-filter: blur(20px) saturate(180%);
   -webkit-backdrop-filter: blur(20px) saturate(180%);
-  border: 1px solid var(--border);
+  border: 1px solid rgba(255, 255, 255, 0.1);
   border-radius: 2.5rem;
-  box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.2);
+  box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.5);
   overflow: hidden;
   transition: all 0.5s;
-}
-
-.dark .glass-morphism {
-  background: rgba(15, 23, 42, 0.6);
 }
 
 .auth-content {
@@ -92,23 +104,23 @@ body {
   justify-content: center;
   width: 4rem;
   height: 4rem;
-  background: var(--primary);
-  opacity: 0.9;
+  background: rgba(99, 102, 241, 0.2);
+  border: 1px solid rgba(99, 102, 241, 0.2);
   border-radius: 1.5rem;
-  color: var(--primary-foreground);
+  color: #818cf8;
   margin: 0 auto 1.5rem;
 }
 
 .auth-title {
   font-size: 2rem;
   font-weight: 900;
-  color: var(--foreground);
+  color: #fff;
   margin-bottom: 0.75rem;
   letter-spacing: -0.025em;
 }
 
 .auth-subtitle {
-  color: var(--muted-foreground);
+  color: #94a3b8;
   font-weight: 500;
   font-size: 0.95rem;
 }
@@ -129,7 +141,7 @@ body {
 .input-label {
   font-size: 0.75rem;
   font-weight: 600;
-  color: var(--muted-foreground);
+  color: #94a3b8;
   text-transform: uppercase;
   letter-spacing: 0.05em;
   margin-left: 0.25rem;
@@ -161,11 +173,11 @@ body {
 
 .auth-input {
   width: 100%;
-  background: var(--input);
-  border: 1px solid var(--border);
+  background: rgba(15, 23, 42, 0.4);
+  border: 1px solid rgba(255, 255, 255, 0.05);
   border-radius: 0.75rem;
   padding: 0.875rem 1rem 0.875rem 3rem;
-  color: var(--foreground);
+  color: #fff;
   font-size: 0.875rem;
   outline: none;
   transition: all 0.3s;
@@ -220,8 +232,8 @@ body {
 /* Button */
 .auth-button {
   width: 100%;
-  background: var(--primary);
-  color: var(--primary-foreground);
+  background: #6366f1;
+  color: #fff;
   font-size: 0.875rem;
   font-weight: 700;
   padding: 1rem 1.5rem;
@@ -229,7 +241,7 @@ body {
   border-radius: 1rem;
   cursor: pointer;
   transition: all 0.3s;
-  box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.1);
+  box-shadow: 0 10px 25px -5px rgba(99, 102, 241, 0.3);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -238,9 +250,9 @@ body {
 }
 
 .auth-button:hover:not(:disabled) {
-  background: #059669; /* Darker emerald */
+  background: #4f46e5;
   transform: translateY(-2px);
-  box-shadow: 0 15px 30px -5px rgba(16, 185, 129, 0.4);
+  box-shadow: 0 15px 30px -5px rgba(99, 102, 241, 0.4);
 }
 
 .auth-button:active:not(:disabled) {

@@ -16,20 +16,14 @@ const Toast = ({ message, type = "info", onClose, duration = 3000 }) => {
   };
 
   const colors = {
-    success: "bg-[var(--primary)]",
-    error: "bg-[var(--destructive)]",
-    info: "bg-[var(--accent)]",
-  };
-
-  const textColors = {
-    success: "text-[var(--primary-foreground)]",
-    error: "text-[var(--destructive-foreground)]",
-    info: "text-[var(--accent-foreground)]",
+    success: "bg-emerald-500/90",
+    error: "bg-red-500/90",
+    info: "bg-indigo-500/90",
   };
 
   return (
     <div
-      className={`${colors[type]} ${textColors[type]} backdrop-blur-md px-6 py-4 rounded-2xl shadow-2xl flex items-center space-x-4 min-w-[300px] max-w-md animate-slide-up border border-white/10`}
+      className={`${colors[type]} backdrop-blur-md text-white px-6 py-4 rounded-2xl shadow-2xl flex items-center space-x-4 min-w-[300px] max-w-md animate-slide-up`}
     >
       <div className="flex-shrink-0">{icons[type]}</div>
       <p className="flex-1 font-semibold text-sm">{message}</p>
