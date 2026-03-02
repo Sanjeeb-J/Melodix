@@ -89,8 +89,8 @@ function PlayerBar() {
       className="fixed bottom-0 left-0 right-0 z-50 flex items-center justify-between px-4 border-t border-[rgba(255,255,255,0.06)]"
       style={{ height: "var(--player-height)", background: "#181818" }}
     >
-      {/* Left: song info */}
-      <div className="flex items-center gap-3 w-[30%] min-w-0">
+      {/* Left: song info (hidden on mobile) */}
+      <div className="hidden md:flex items-center gap-3 w-[30%] min-w-0">
         {currentSong ? (
           <>
             <img
@@ -110,6 +110,15 @@ function PlayerBar() {
           </>
         ) : (
           <div className="text-sp-muted text-xs">No song playing</div>
+        )}
+      </div>
+
+      {/* Mobile song info (only title) */}
+      <div className="flex md:hidden flex-col min-w-0 flex-1 mr-4">
+        {currentSong && (
+          <p className="text-sm font-semibold text-white truncate">
+            {currentSong.name || currentSong.title}
+          </p>
         )}
       </div>
 
@@ -161,7 +170,7 @@ function PlayerBar() {
 
         {/* Progress bar */}
         <div className="flex items-center gap-2 w-full max-w-md">
-          <span className="text-xs text-sp-muted w-8 text-right tabular-nums">
+          <span className="hidden md:block text-xs text-sp-muted w-8 text-right tabular-nums">
             {fmtTime(currentTime)}
           </span>
           <div
@@ -174,14 +183,14 @@ function PlayerBar() {
               style={{ width: `${(progress || 0) * 100}%` }}
             />
           </div>
-          <span className="text-xs text-sp-muted w-8 tabular-nums">
+          <span className="hidden md:block text-xs text-sp-muted w-8 tabular-nums">
             {fmtTime(duration)}
           </span>
         </div>
       </div>
 
-      {/* Right: volume */}
-      <div className="flex items-center gap-2 w-[30%] justify-end">
+      {/* Right: volume (hidden on mobile) */}
+      <div className="hidden md:flex items-center gap-2 w-[30%] justify-end">
         <button
           onClick={() => setVolume(volume === 0 ? 0.7 : 0)}
           className="text-sp-dim hover:text-white transition-colors"
@@ -368,7 +377,7 @@ function HomeView({ playlists, onPlaylistClick, onCreatePlaylist }) {
 
       {/* Quick access grid */}
       {playlists.length > 0 && (
-        <div className="grid grid-cols-2 lg:grid-cols-3 gap-3 mb-8">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 mb-8">
           {playlists.slice(0, 6).map((p) => (
             <button
               key={p._id}
@@ -418,7 +427,7 @@ function HomeView({ playlists, onPlaylistClick, onCreatePlaylist }) {
           </button>
         </div>
       ) : (
-        <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-4">
+        <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-4">
           {playlists.map((p) => (
             <PlaylistCard key={p._id} playlist={p} onClick={() => onPlaylistClick(p)} />
           ))}
@@ -711,7 +720,7 @@ function PlaylistView({ playlist, onBack, onUpdate, onDelete }) {
 
       {/* Song list */}
       {playlist.songs?.length > 0 ? (
-        <div>
+        <div className="bg-[#121212] lg:bg-transparent">
           {/* Table header */}
           <div className="grid grid-cols-[2rem_1fr_auto] md:grid-cols-[2rem_1fr_auto_5rem_3rem] gap-4 px-4 mb-2 text-xs text-sp-muted uppercase tracking-wider font-bold border-b border-[rgba(255,255,255,0.06)] pb-2">
             <span>#</span>
@@ -724,19 +733,18 @@ function PlaylistView({ playlist, onBack, onUpdate, onDelete }) {
           {playlist.songs.map((song, idx) => (
             <div
               key={song._id}
-              onDoubleClick={() => handlePlay(song, idx)}
-              className={`grid grid-cols-[2rem_1fr_auto] md:grid-cols-[2rem_1fr_auto_5rem_3rem] gap-4 px-4 py-2.5 rounded-md transition-all cursor-pointer group hover:bg-sp-hover ${
+              onClick={() => handlePlay(song, idx)}
+              className={`grid grid-cols-[3rem_1fr_auto] md:grid-cols-[2rem_1fr_auto_5rem_3rem] gap-4 px-2 md:px-4 py-2.5 rounded-md transition-all cursor-pointer group hover:bg-sp-hover ${
                 isCurrent(song) ? "bg-[rgba(29,185,84,0.06)]" : ""
               }`}
             >
               {/* # / play */}
-              <div className="flex items-center">
-                <span className={`text-sm group-hover:hidden ${isCurrent(song) ? "text-sp-green font-bold" : "text-sp-muted"}`}>
+              <div className="flex items-center justify-center">
+                <span className={`text-sm md:group-hover:hidden ${isCurrent(song) ? "text-sp-green font-bold" : "text-sp-muted"}`}>
                   {isCurrent(song) && isPlaying ? "♫" : idx + 1}
                 </span>
                 <button
-                  onClick={() => handlePlay(song, idx)}
-                  className="hidden group-hover:flex items-center justify-center"
+                  className="hidden md:group-hover:flex items-center justify-center transition-all"
                 >
                   {isCurrent(song) && isPlaying ? (
                     <Pause size={16} fill="white" className="text-white" />
