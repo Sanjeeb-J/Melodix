@@ -84,7 +84,7 @@ function Auth() {
       localStorage.setItem("token", res.token);
       setStatus("success");
       setTimeout(() => {
-        navigate("/dashboard");
+        navigate("/");
       }, 1000);
     } catch (err) {
       setStatus("idle");
@@ -102,7 +102,7 @@ function Auth() {
         alert("Account created! Please sign in.");
         setIsLogin(true);
         setStatus("idle");
-      }, 1000);
+      }, 1500);
     } catch (err) {
       setStatus("idle");
       alert(err.message || "Registration failed");
