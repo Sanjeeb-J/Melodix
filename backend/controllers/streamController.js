@@ -7,6 +7,19 @@ let ytDlp;
 
 const getYtDlp = async () => {
   if (!ytDlp) {
+    // 1. Try system-installed yt-dlp first (Railway Nixpacks)
+    try {
+      const { execSync } = require("child_process");
+      execSync("yt-dlp --version", { stdio: "ignore" });
+      console.log("[Streaming] Using system-installed yt-dlp");
+      ytDlp = new YTDlpWrap("yt-dlp");
+      return ytDlp;
+    } catch (e) {
+      // Not in path, fallback to manual binary
+      console.log("[Streaming] System yt-dlp not found, checking manual binary...");
+    }
+
+    // 2. Fallback to manual binary download
     const binaryDir = path.join(__dirname, "..", "bin");
     if (!fs.existsSync(binaryDir)) {
       fs.mkdirSync(binaryDir, { recursive: true });
@@ -17,9 +30,9 @@ const getYtDlp = async () => {
     );
 
     if (!fs.existsSync(binaryPath)) {
-      console.log("Downloading yt-dlp binary...");
+      console.log("[Streaming] Downloading yt-dlp binary...");
       await YTDlpWrap.downloadFromGithub(binaryPath);
-      console.log("yt-dlp binary downloaded.");
+      console.log("[Streaming] yt-dlp binary downloaded.");
     }
 
     ytDlp = new YTDlpWrap(binaryPath);
