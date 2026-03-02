@@ -652,7 +652,7 @@ function PlaylistView({ playlist, onBack, onUpdate, onDelete }) {
     <div className="animate-in">
       {/* Header */}
       <div
-        className="flex flex-col md:flex-row items-end gap-6 p-6 rounded-t-xl mb-4"
+        className="flex flex-col  md:flex-row items-center gap-6 p-6 rounded-t-xl mb-4"
         style={{
           background: `linear-gradient(to bottom, rgba(29,185,84,0.25) 0%, #121212 100%)`,
         }}

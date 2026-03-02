@@ -40,15 +40,16 @@ const streamAudio = async (req, res) => {
   try {
     const yt = await getYtDlp();
 
-    // Use a more standard audio MIME type
-    res.setHeader("Content-Type", "audio/mpeg");
-    res.setHeader("Cache-Control", "no-cache");
+    // Standard headers for streaming audio
+    res.setHeader("Content-Type", "audio/webm");
+    res.setHeader("Accept-Ranges", "bytes");
     res.setHeader("Connection", "keep-alive");
+    res.setHeader("Transfer-Encoding", "chunked");
 
-    // Improved flags for better streaming compatibility
+    // Simplified flags for raw audio extraction
     const stream = yt.execStream([
       url,
-      "-f", "bestaudio/best",
+      "-f", "bestaudio[ext=webm]/bestaudio/best",
       "--no-playlist",
       "--quiet",
       "--no-warnings",
@@ -61,7 +62,9 @@ const streamAudio = async (req, res) => {
 
     req.on("close", () => {
       console.log(`[Streaming] Client closed connection for ${videoId}`);
-      if (stream.ytDlpProcess) stream.ytDlpProcess.kill();
+      if (stream.ytOriginalProcess) {
+        stream.ytOriginalProcess.kill();
+      }
       stream.destroy();
     });
 

@@ -162,7 +162,7 @@ export const PlayerProvider = ({ children }) => {
       }}
     >
       {/* Hidden audio element */}
-      <audio ref={audioRef} preload="none" />
+      <audio ref={audioRef} preload="metadata" />
       {children}
     </PlayerContext.Provider>
   );
