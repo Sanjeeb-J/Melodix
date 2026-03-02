@@ -1037,6 +1037,7 @@ export default function Dashboard() {
     }
   };
 
+  const [isSidebarOpen, setIsSidebarOpen] = useState(false);
   const handleLogout = () => { logout(); navigate("/"); };
 
   if (loading) {
@@ -1054,52 +1055,66 @@ export default function Dashboard() {
 
   return (
     <div className="h-screen flex flex-col overflow-hidden bg-sp-black">
-      {/* Main layout (above player bar) */}
-      <div
-        className="flex flex-1 gap-2 p-2 overflow-hidden"
-        style={{ paddingBottom: "calc(var(--player-height) + 0.5rem)" }}
-      >
+      {/* Main layout (sidebar + content) */}
+      <div className="flex flex-1 overflow-hidden relative">
         {/* Sidebar */}
         <Sidebar
           view={view}
-          setView={setView}
+          setView={(v) => { setView(v); setIsSidebarOpen(false); }}
           playlists={playlists}
-          onPlaylistClick={handlePlaylistClick}
-          onCreatePlaylist={() => setShowCreate(true)}
+          onPlaylistClick={(p) => { handlePlaylistClick(p); setIsSidebarOpen(false); }}
+          onCreatePlaylist={() => { setShowCreate(true); setIsSidebarOpen(false); }}
           onLogout={handleLogout}
+          isOpen={isSidebarOpen}
+          onClose={() => setIsSidebarOpen(false)}
         />
 
-        {/* Main content */}
+        {/* Main content area */}
         <main
-          className="flex-1 rounded-lg overflow-y-auto p-6"
+          className="flex-1 relative overflow-y-auto main-scroll scroll-smooth lg:m-2 lg:rounded-lg"
           style={{ background: "#121212" }}
         >
+          {/* Header for mobile */}
+          <header className="lg:hidden sticky top-0 z-20 flex items-center p-4 bg-[#121212]/90 backdrop-blur-sm">
+            <button
+              onClick={() => setIsSidebarOpen(true)}
+              className="text-white hover:text-sp-green transition-colors"
+            >
+              <Menu size={24} />
+            </button>
+            <div className="ml-4 flex items-center gap-2 font-black text-white">
+               <Music2 size={24} className="text-sp-green" />
+               Melodix
+            </div>
+          </header>
 
-          {view === "home" && (
-            <HomeView
-              playlists={playlists}
-              onPlaylistClick={handlePlaylistClick}
-              onCreatePlaylist={() => setShowCreate(true)}
-            />
-          )}
+          <div className="p-4 lg:p-6 pb-[120px]">
+            {view === "home" && (
+              <HomeView
+                playlists={playlists}
+                onPlaylistClick={handlePlaylistClick}
+                onCreatePlaylist={() => setShowCreate(true)}
+              />
+            )}
 
-          {view === "search" && (
-            <SearchView
-              selectedPlaylist={selectedPlaylist}
-              playlists={playlists}
-              onPlaylistSelect={(p) => setSelectedPlaylist(p)}
-            />
-          )}
+            {view === "search" && (
+              <SearchView
+                selectedPlaylist={selectedPlaylist}
+                playlists={playlists}
+                onPlaylistSelect={(p) => setSelectedPlaylist(p)}
+              />
+            )}
 
-          {isPlaylistView && currentPlaylist && (
-            <PlaylistView
-              key={currentPlaylist._id}
-              playlist={currentPlaylist}
-              onBack={() => setView("home")}
-              onUpdate={handlePlaylistUpdate}
-              onDelete={handlePlaylistDelete}
-            />
-          )}
+            {isPlaylistView && currentPlaylist && (
+              <PlaylistView
+                key={currentPlaylist._id}
+                playlist={currentPlaylist}
+                onBack={() => setView("home")}
+                onUpdate={handlePlaylistUpdate}
+                onDelete={handlePlaylistDelete}
+              />
+            )}
+          </div>
         </main>
       </div>
 
