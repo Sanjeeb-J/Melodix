@@ -253,8 +253,8 @@ function Dashboard() {
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-black flex items-center justify-center">
-        <div className="w-16 h-16 border-4 border-indigo-500 border-t-transparent rounded-full animate-spin"></div>
+      <div className="min-h-screen bg-[var(--background)] flex items-center justify-center">
+        <div className="w-16 h-16 border-4 border-[var(--primary)] border-t-transparent rounded-full animate-spin"></div>
       </div>
     );
   }
@@ -279,20 +279,9 @@ function Dashboard() {
               onClick={(e) => e.stopPropagation()}
             >
               {/* Sidebar Content */}
-              <div className="flex items-center space-x-2 text-indigo-500 font-bold text-2xl mb-8">
-                <div className="bg-indigo-600/10 p-1.5 rounded-lg">
-                  <svg
-                    width="28"
-                    height="28"
-                    viewBox="0 0 24 24"
-                    fill="none"
-                    stroke="currentColor"
-                    strokeWidth="2.5"
-                  >
-                    <path d="M9 18V5l12-2v13" />
-                    <circle cx="6" cy="18" r="3" />
-                    <circle cx="18" cy="16" r="3" />
-                  </svg>
+              <div className="flex items-center space-x-2 text-[var(--primary)] font-bold text-2xl mb-8">
+                <div className="bg-[var(--primary)]/10 p-1.5 rounded-lg">
+                  <Music size={28} />
                 </div>
                 <span>Melodix</span>
               </div>
@@ -501,7 +490,7 @@ function Dashboard() {
                   </button>
                   <button
                     onClick={() => deletePlaylistHandler(p._id)}
-                    className="opacity-0 group-hover:opacity-100 p-2 text-zinc-600 hover:text-red-500 transition-all"
+                    className="opacity-0 group-hover:opacity-100 p-2 text-[var(--muted-foreground)] hover:text-[var(--destructive)] transition-all"
                   >
                     <svg
                       width="14"
