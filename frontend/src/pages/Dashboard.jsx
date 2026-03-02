@@ -13,7 +13,7 @@ import { searchYouTube } from "../services/youtubeService";
 import { useToast } from "../components/ToastContainer";
 import EditModal from "../components/EditModal";
 import { getPlaylistCover } from "../utils/playlistCover";
-import { Edit2, Clock, Sun, Moon } from "lucide-react";
+import { Edit2, Clock, Sun, Moon, Music, Search, X, Trash2 } from "lucide-react";
 import { useTheme } from "../context/ThemeContext";
 import { AuthContext } from "../context/AuthContext";
 import { useContext } from "react";
