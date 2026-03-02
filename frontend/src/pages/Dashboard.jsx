@@ -13,9 +13,12 @@ import { searchYouTube } from "../services/youtubeService";
 import { useToast } from "../components/ToastContainer";
 import EditModal from "../components/EditModal";
 import { getPlaylistCover } from "../utils/playlistCover";
-import { Edit2, Clock } from "lucide-react";
+import { Edit2, Clock, Sun, Moon } from "lucide-react";
+import { useTheme } from "../context/ThemeContext";
+import { AuthContext } from "../context/AuthContext";
 
 function Dashboard() {
+  const { theme, toggleTheme } = useTheme();
   const [searchQuery, setSearchQuery] = useState("");
   const [searchResults, setSearchResults] = useState([]);
   const [searchLoading, setSearchLoading] = useState(false);
@@ -258,7 +261,7 @@ function Dashboard() {
   }
 
   return (
-    <div className="h-screen w-full flex flex-col bg-black text-white selection:bg-indigo-500/50 relative overflow-hidden">
+    <div className="h-screen w-full flex flex-col bg-background text-foreground selection:bg-indigo-500/50 relative overflow-hidden transition-colors duration-300">
       {/* Background decoration */}
       <div className="absolute top-0 left-0 w-full h-full pointer-events-none opacity-30">
         <div className="absolute top-0 right-0 w-1/2 h-1/2 bg-indigo-900/10 blur-[150px] rounded-full"></div>
@@ -277,8 +280,9 @@ function Dashboard() {
               onClick={(e) => e.stopPropagation()}
             >
               {/* Sidebar Content */}
-              <div className="flex items-center space-x-2 text-indigo-500 font-bold text-2xl mb-8">
-                <div className="bg-indigo-600/10 p-1.5 rounded-lg">
+              <div className="flex items-center justify-between mb-8">
+                <div className="flex items-center space-x-2 text-indigo-500 font-bold text-2xl">
+                  <div className="bg-indigo-600/10 p-1.5 rounded-lg">
                   <svg
                     width="28"
                     height="28"
@@ -292,7 +296,14 @@ function Dashboard() {
                     <circle cx="18" cy="16" r="3" />
                   </svg>
                 </div>
-                <span>Melodix</span>
+                  <span>Melodix</span>
+                </div>
+                <button
+                  onClick={toggleTheme}
+                  className="p-2 rounded-xl bg-muted text-foreground hover:bg-accent transition-all"
+                >
+                  {theme === "light" ? <Moon size={20} /> : <Sun size={20} />}
+                </button>
               </div>
 
               <nav className="space-y-1 mb-8">
@@ -395,7 +406,7 @@ function Dashboard() {
         )}
 
         {/* Desktop Sidebar */}
-        <div className="hidden md:flex w-64 bg-black h-full flex-col p-6 space-y-8 border-r border-zinc-900">
+        <div className="hidden md:flex w-64 bg-background h-full flex-col p-6 space-y-8 border-r border-border">
           <div className="flex items-center space-x-2 text-indigo-500 font-bold text-2xl">
             <div className="bg-indigo-600/10 p-1.5 rounded-lg">
               <svg
@@ -413,6 +424,16 @@ function Dashboard() {
             </div>
             <span>Melodix</span>
           </div>
+
+          <button
+            onClick={toggleTheme}
+            className="flex items-center space-x-4 w-full px-4 py-3 rounded-xl transition-all bg-muted text-foreground hover:bg-accent"
+          >
+            {theme === "light" ? <Moon size={20} /> : <Sun size={20} />}
+            <span className="font-semibold text-sm">
+              {theme === "light" ? "Dark Mode" : "Light Mode"}
+            </span>
+          </button>
 
           <nav className="space-y-1">
             <button
@@ -525,9 +546,9 @@ function Dashboard() {
           </button>
         </div>
 
-        <main className="flex-1 w-full overflow-y-auto bg-gradient-to-b from-transparent to-black p-4 md:p-8">
+        <main className="flex-1 w-full overflow-y-auto bg-gradient-to-b from-transparent to-background p-4 md:p-8">
           {/* Mobile Header */}
-          <header className="flex md:hidden items-center justify-between mb-6 sticky top-0 bg-black/50 backdrop-blur-md -mx-4 px-4 py-3 z-40 border-b border-white/5">
+          <header className="flex md:hidden items-center justify-between mb-6 sticky top-0 bg-background/50 backdrop-blur-md -mx-4 px-4 py-3 z-40 border-b border-border">
             <button
               onClick={() => setIsMobileMenuOpen(true)}
               className="p-2 text-zinc-400"

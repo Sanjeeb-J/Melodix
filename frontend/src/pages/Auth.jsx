@@ -1,229 +1,163 @@
-import { useState } from "react";
+import React, { useState } from "react";
 import "../styles/Auth.css";
 import { loginUser, registerUser } from "../services/authService";
 import { useNavigate } from "react-router-dom";
-import {
-  Mail,
-  Lock,
-  Eye,
-  EyeOff,
-  User,
-  Loader2,
-  CheckCircle2,
-  Music,
+import { useTheme } from "../context/ThemeContext";
+import { 
+    Github, 
+    Facebook, 
+    Linkedin, 
+    Mail, 
+    Lock, 
+    User, 
+    Sun, 
+    Moon, 
+    Loader2, 
+    Music2 
 } from "lucide-react";
 
-// Reusable Input Component
-const InputField = ({
-  label,
-  type,
-  placeholder,
-  value,
-  onChange,
-  icon: Icon,
-  showPasswordToggle,
-  showPassword,
-  onPasswordToggle,
-  required = true,
-  minLength,
-}) => (
-  <div className="space-y-1.5 group">
-    <label className="input-label">{label}</label>
-    <div className="relative input-focus-effect rounded-xl transition-all duration-300">
-      <div className="input-icon">
-        <Icon size={18} />
-      </div>
-      <input
-        type={type}
-        required={required}
-        placeholder={placeholder}
-        value={value}
-        onChange={(e) => onChange(e.target.value)}
-        minLength={minLength}
-        className="auth-input"
-      />
-      {showPasswordToggle && (
-        <button
-          type="button"
-          onClick={onPasswordToggle}
-          className="password-toggle"
-        >
-          {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
-        </button>
-      )}
-    </div>
-  </div>
-);
-
 function Auth() {
-  const [isLogin, setIsLogin] = useState(true);
-  const [showPassword, setShowPassword] = useState(false);
-  const [status, setStatus] = useState("idle");
-  const navigate = useNavigate();
+    const { theme, toggleTheme } = useTheme();
+    const [isActive, setIsActive] = useState(false);
+    const [status, setStatus] = useState("idle");
+    const navigate = useNavigate();
 
-  const [loginData, setLoginData] = useState({
-    email: "",
-    password: "",
-  });
+    const [loginData, setLoginData] = useState({ email: "", password: "" });
+    const [registerData, setRegisterData] = useState({ name: "", email: "", password: "" });
 
-  const [registerData, setRegisterData] = useState({
-    name: "",
-    email: "",
-    password: "",
-  });
+    const handleLogin = async (e) => {
+        e.preventDefault();
+        setStatus("loading");
+        try {
+            const res = await loginUser(loginData);
+            localStorage.setItem("token", res.token);
+            setStatus("success");
+            setTimeout(() => navigate("/dashboard"), 1000);
+        } catch (err) {
+            setStatus("idle");
+            alert(err.message || "Login failed");
+        }
+    };
 
-  const handleLogin = async (e) => {
-    e.preventDefault();
-    setStatus("loading");
-    try {
-      const res = await loginUser(loginData);
-      localStorage.setItem("token", res.token);
-      setStatus("success");
-      setTimeout(() => {
-        navigate("/dashboard");
-      }, 1000);
-    } catch (err) {
-      setStatus("idle");
-      alert(err.message || "Login failed");
-    }
-  };
+    const handleRegister = async (e) => {
+        e.preventDefault();
+        setStatus("loading");
+        try {
+            await registerUser(registerData);
+            setStatus("success");
+            setTimeout(() => {
+                setIsActive(false);
+                setStatus("idle");
+            }, 1000);
+        } catch (err) {
+            setStatus("idle");
+            alert(err.message || "Registration failed");
+        }
+    };
 
-  const handleRegister = async (e) => {
-    e.preventDefault();
-    setStatus("loading");
-    try {
-      await registerUser(registerData);
-      setStatus("success");
-      setTimeout(() => {
-        alert("Account created! Please sign in.");
-        setIsLogin(true);
-        setStatus("idle");
-      }, 1000);
-    } catch (err) {
-      setStatus("idle");
-      alert(err.message || "Registration failed");
-    }
-  };
+    return (
+        <div className="auth-page-root">
+            <div className="auth-bg-container"></div>
+            <div className="auth-bg-overlay"></div>
 
-  const toggleMode = () => {
-    setIsLogin((prev) => !prev);
-    setStatus("idle");
-  };
-
-  return (
-    <div className="auth-wrapper">
-      <div className="auth-container entrance-anim">
-        <div className="glass-morphism">
-          <div className="auth-content">
-            {/* Header */}
-            <div className="auth-header">
-              <div className="logo-icon">
-                <Music size={32} />
-              </div>
-              <h1 className="auth-title">
-                {isLogin ? "Welcome Back" : "Get Started"}
-              </h1>
-              <p className="auth-subtitle">
-                {isLogin
-                  ? "Sign in to access your personalized music library"
-                  : "Create an account to start building your music collection"}
-              </p>
-            </div>
-
-            {/* Auth Form */}
-            <form
-              onSubmit={isLogin ? handleLogin : handleRegister}
-              className="auth-form form-transition"
-            >
-              {!isLogin && (
-                <InputField
-                  label="Full Name"
-                  type="text"
-                  placeholder="Your Name"
-                  value={registerData.name}
-                  onChange={(val) =>
-                    setRegisterData({ ...registerData, name: val })
-                  }
-                  icon={User}
-                />
-              )}
-
-              <InputField
-                label="Email Address"
-                type="email"
-                placeholder="you@melodix.com"
-                value={isLogin ? loginData.email : registerData.email}
-                onChange={(val) =>
-                  isLogin
-                    ? setLoginData({ ...loginData, email: val })
-                    : setRegisterData({ ...registerData, email: val })
-                }
-                icon={Mail}
-              />
-
-              <InputField
-                label="Password"
-                type={showPassword ? "text" : "password"}
-                placeholder="••••••••"
-                value={isLogin ? loginData.password : registerData.password}
-                onChange={(val) =>
-                  isLogin
-                    ? setLoginData({ ...loginData, password: val })
-                    : setRegisterData({ ...registerData, password: val })
-                }
-                icon={Lock}
-                showPasswordToggle={true}
-                showPassword={showPassword}
-                onPasswordToggle={() => setShowPassword(!showPassword)}
-                minLength={isLogin ? undefined : "6"}
-              />
-
-              {isLogin && (
-                <div className="forgot-password-container">
-                  <a href="#" className="forgot-link">
-                    Forgot password?
-                  </a>
-                </div>
-              )}
-
-              <button
-                type="submit"
-                disabled={status !== "idle"}
-                className={`auth-button btn-glow ${
-                  status === "success" ? "success" : ""
-                }`}
-              >
-                {status === "loading" && (
-                  <Loader2 className="animate-spin" size={20} />
-                )}
-                {status === "success" && <CheckCircle2 size={20} />}
-                {status === "idle" && (
-                  <>{isLogin ? "Sign In" : "Create Account"}</>
-                )}
-                {status === "loading" && "Verifying..."}
-                {status === "success" && "Success!"}
-              </button>
-            </form>
-
-            {/* Toggle Link */}
-            <div className="toggle-section">
-              <p className="toggle-text">
-                {isLogin ? "New to Melodix?" : "Already have an account?"}{" "}
-                <button onClick={toggleMode} className="toggle-link">
-                  {isLogin ? "Create an account" : "Sign in here"}
+            <div className="theme-switch-wrapper">
+                <button className="theme-switch" onClick={toggleTheme}>
+                    {theme === 'light' ? <Moon size={20} /> : <Sun size={20} />}
                 </button>
-              </p>
             </div>
-          </div>
-        </div>
 
-        {/* Footer */}
-        <footer className="auth-footer-new">
-          <p>Powered by Melodix © 2026| Your Premium Music Experience</p>
-        </footer>
-      </div>
-    </div>
-  );
+            <div className={`container ${isActive ? "active" : ""}`} id="container">
+                {status === "loading" && (
+                    <div className="auth-status-overlay">
+                        <span className="loader"></span>
+                    </div>
+                )}
+
+                <div className="form-container sign-up">
+                    <form onSubmit={handleRegister}>
+                        <h1>Create Account</h1>
+                        <div className="social-icons">
+                            <a href="#" className="icon"><Facebook size={20} /></a>
+                            <a href="#" className="icon"><Github size={20} /></a>
+                            <a href="#" className="icon"><Linkedin size={20} /></a>
+                        </div>
+                        <span>or use your email for registration</span>
+                        <input 
+                            type="text" 
+                            placeholder="Name" 
+                            value={registerData.name}
+                            onChange={(e) => setRegisterData({...registerData, name: e.target.value})}
+                            required
+                        />
+                        <input 
+                            type="email" 
+                            placeholder="Email" 
+                            value={registerData.email}
+                            onChange={(e) => setRegisterData({...registerData, email: e.target.value})}
+                            required
+                        />
+                        <input 
+                            type="password" 
+                            placeholder="Password" 
+                            value={registerData.password}
+                            onChange={(e) => setRegisterData({...registerData, password: e.target.value})}
+                            required
+                        />
+                        <button type="submit">Sign Up</button>
+                        <button type="button" className="hidden md:hidden mobile-toggle" onClick={() => setIsActive(false)}>Already have an account? Sign In</button>
+                    </form>
+                </div>
+
+                <div className="form-container sign-in">
+                    <form onSubmit={handleLogin}>
+                        <div className="flex items-center gap-2 text-primary mb-4">
+                           <Music2 size={32} strokeWidth={3} />
+                           <h1 className="!m-0">Melodix</h1>
+                        </div>
+                        <h1>Sign In</h1>
+                        <div className="social-icons">
+                            <a href="#" className="icon"><Facebook size={20} /></a>
+                            <a href="#" className="icon"><Github size={20} /></a>
+                            <a href="#" className="icon"><Linkedin size={20} /></a>
+                        </div>
+                        <span>or use your email password</span>
+                        <input 
+                            type="email" 
+                            placeholder="Email" 
+                            value={loginData.email}
+                            onChange={(e) => setLoginData({...loginData, email: e.target.value})}
+                            required
+                        />
+                        <input 
+                            type="password" 
+                            placeholder="Password" 
+                            value={loginData.password}
+                            onChange={(e) => setLoginData({...loginData, password: e.target.value})}
+                            required
+                        />
+                        <a href="#">Forgot Your Password?</a>
+                        <button type="submit">Sign In</button>
+                        <button type="button" className="hidden md:hidden mobile-toggle" onClick={() => setIsActive(true)}>New here? Create Account</button>
+                    </form>
+                </div>
+
+                <div className="toggle-container">
+                    <div className="toggle">
+                        <div className="toggle-panel toggle-left">
+                            <h1>Welcome Back!</h1>
+                            <p>To keep connected with us please login with your personal info</p>
+                            <button className="hidden" onClick={() => setIsActive(false)}>Sign In</button>
+                        </div>
+                        <div className="toggle-panel toggle-right">
+                            <h1>Hello, Friend!</h1>
+                            <p>Enter your personal details and start your music journey with us</p>
+                            <button className="hidden" onClick={() => setIsActive(true)}>Sign Up</button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    );
 }
 
 export default Auth;
