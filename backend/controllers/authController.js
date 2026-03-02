@@ -45,7 +45,7 @@ const loginUser = async (req, res) => {
       return res.status(400).json({ message: "Invalid credentials" });
     }
 
-    const token = jwt.sign({ id: user._id }, "supersecretkey", {
+    const token = jwt.sign({ id: user._id }, process.env.JWT_SECRET || "melodix_super_secret_2026", {
       expiresIn: "7d",
     });
 
