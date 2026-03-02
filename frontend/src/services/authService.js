@@ -1,4 +1,4 @@
-const API_URL = "https://melodix-backend.onrender.com/api/auth";
+const API_URL = `${import.meta.env.VITE_API_URL}/api/auth`;
 
 export const registerUser = async (userData) => {
   const res = await fetch(`${API_URL}/register`, {

@@ -1,4 +1,4 @@
-const API_URL = "https://melodix-backend.onrender.com/api/youtube/search";
+const API_URL = `${import.meta.env.VITE_API_URL}/api/youtube/search`;
 
 export const searchYouTube = async (query) => {
   const token = localStorage.getItem("token");

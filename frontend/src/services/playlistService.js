@@ -1,4 +1,4 @@
-const API_URL = "https://melodix-backend.onrender.com/api/playlists";
+const API_URL = `${import.meta.env.VITE_API_URL}/api/playlists`;
 
 export const getPlaylists = async () => {
   const token = localStorage.getItem("token");
