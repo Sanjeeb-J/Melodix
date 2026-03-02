@@ -1,44 +1,6 @@
-const YTDlpWrap = require("yt-dlp-wrap").default;
-const path = require("path");
-const fs = require("fs");
-
-// Initialize yt-dlp - will auto-download binary if not present
-let ytDlp;
-
-const getYtDlp = async () => {
-  if (!ytDlp) {
-    // 1. Try system-installed yt-dlp first (Railway Nixpacks)
-    try {
-      const { execSync } = require("child_process");
-      execSync("yt-dlp --version", { stdio: "ignore" });
-      console.log("[Streaming] Using system-installed yt-dlp");
-      ytDlp = new YTDlpWrap("yt-dlp");
-      return ytDlp;
-    } catch (e) {
-      // Not in path, fallback to manual binary
-      console.log("[Streaming] System yt-dlp not found, checking manual binary...");
-    }
-
-    // 2. Fallback to manual binary download
-    const binaryDir = path.join(__dirname, "..", "bin");
-    if (!fs.existsSync(binaryDir)) {
-      fs.mkdirSync(binaryDir, { recursive: true });
-    }
-    const binaryPath = path.join(
-      binaryDir,
-      process.platform === "win32" ? "yt-dlp.exe" : "yt-dlp"
-    );
-
-    if (!fs.existsSync(binaryPath)) {
-      console.log("[Streaming] Downloading yt-dlp binary...");
-      await YTDlpWrap.downloadFromGithub(binaryPath);
-      console.log("[Streaming] yt-dlp binary downloaded.");
-    }
-
-    ytDlp = new YTDlpWrap(binaryPath);
-  }
-  return ytDlp;
-};
+const play = require("play-dl");
+const https = require("https");
+const http = require("http");
 
 const streamAudio = async (req, res) => {
   const { videoId } = req.params;
@@ -48,55 +10,89 @@ const streamAudio = async (req, res) => {
   }
 
   const url = `https://www.youtube.com/watch?v=${videoId}`;
-  console.log(`[Streaming] Request for videoId: ${videoId}`);
+  console.log(`[Stream] Request for videoId: ${videoId}`);
 
   try {
-    const yt = await getYtDlp();
+    // Get info and all formats
+    const info = await play.video_info(url);
+    const formats = info.format || [];
 
-    // Standard headers for streaming audio
-    res.setHeader("Content-Type", "audio/webm");
-    res.setHeader("Accept-Ranges", "bytes");
-    res.setHeader("Connection", "keep-alive");
-    res.setHeader("Transfer-Encoding", "chunked");
+    if (!formats.length) {
+      return res.status(404).json({ message: "No formats found" });
+    }
 
-    // Simplified flags for raw audio extraction
-    const stream = yt.execStream([
-      url,
-      "-f", "bestaudio[ext=webm]/bestaudio/best",
-      "--no-playlist",
-      "--quiet",
-      "--no-warnings",
-      "-o", "-",
-    ]);
+    // Find the best audio-only format (typically opus/webm or aac/mp4)
+    const audioFormats = formats.filter(
+      (f) => f.mimeType && f.mimeType.includes("audio") && f.url
+    );
 
-    console.log(`[Streaming] Started yt-dlp process for ${videoId}`);
+    // Sort by bitrate descending
+    audioFormats.sort((a, b) => (b.audioBitrate || 0) - (a.audioBitrate || 0));
 
-    stream.pipe(res);
+    const format = audioFormats[0];
 
-    req.on("close", () => {
-      console.log(`[Streaming] Client closed connection for ${videoId}`);
-      if (stream.ytOriginalProcess) {
-        stream.ytOriginalProcess.kill();
+    if (!format || !format.url) {
+      // Fallback: use first format that has a URL
+      const fallback = formats.find((f) => f.url);
+      if (!fallback) {
+        return res.status(404).json({ message: "No usable format found" });
       }
-      stream.destroy();
-    });
+      console.log(`[Stream] Using fallback format: ${fallback.mimeType}`);
+      return proxyAudioUrl(fallback.url, fallback.mimeType, res, req, videoId);
+    }
 
-    stream.on("error", (err) => {
-      console.error(`[Streaming] yt-dlp stream error for ${videoId}:`, err.message);
-      if (!res.headersSent) {
-        res.status(500).send("Stream failed");
-      }
-    });
+    console.log(`[Stream] Format: ${format.mimeType}, bitrate: ${format.audioBitrate}`);
+    return proxyAudioUrl(format.url, format.mimeType, res, req, videoId);
 
-    stream.on("end", () => {
-      console.log(`[Streaming] Finished streaming ${videoId}`);
-    });
   } catch (err) {
-    console.error(`[Streaming] Controller error for ${videoId}:`, err.message);
+    console.error(`[Stream] Failed for ${videoId}:`, err.message);
     if (!res.headersSent) {
-      res.status(500).json({ message: "Could not start stream" });
+      res.status(500).json({ message: "Could not stream audio", error: err.message });
     }
   }
 };
+
+function proxyAudioUrl(audioUrl, mimeType, res, req, videoId) {
+  // Determine content type
+  let contentType = "audio/webm";
+  if (mimeType) {
+    if (mimeType.includes("mp4")) contentType = "audio/mp4";
+    else if (mimeType.includes("webm")) contentType = "audio/webm";
+    else if (mimeType.includes("mpeg")) contentType = "audio/mpeg";
+  }
+
+  res.setHeader("Content-Type", contentType);
+  res.setHeader("Accept-Ranges", "bytes");
+  res.setHeader("Cache-Control", "no-cache");
+  res.setHeader("Access-Control-Allow-Origin", "*");
+
+  const lib = audioUrl.startsWith("https") ? https : http;
+  const ytReq = lib.get(audioUrl, {
+    headers: {
+      "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+      "Referer": "https://www.youtube.com/",
+      "Origin": "https://www.youtube.com",
+    }
+  }, (ytRes) => {
+    // Pass through content-length if available
+    if (ytRes.headers["content-length"]) {
+      res.setHeader("Content-Length", ytRes.headers["content-length"]);
+    }
+    console.log(`[Stream] Proxying ${videoId}, status: ${ytRes.statusCode}`);
+    ytRes.pipe(res);
+  });
+
+  ytReq.on("error", (err) => {
+    console.error(`[Stream] Proxy error for ${videoId}:`, err.message);
+    if (!res.headersSent) {
+      res.status(500).json({ message: "Proxy error" });
+    }
+  });
+
+  req.on("close", () => {
+    console.log(`[Stream] Client closed for ${videoId}`);
+    ytReq.destroy();
+  });
+}
 
 module.exports = { streamAudio };
