@@ -965,9 +965,16 @@ export default function Dashboard() {
     try {
       const data = await getPlaylists();
       setPlaylists(data);
-    } catch {
-      showToast("Session expired. Please log in again.", "error");
-      setTimeout(() => { logout(); navigate("/"); }, 2000);
+    } catch (err) {
+      if (err.status === 401) {
+        // Real auth failure — token is invalid/expired
+        showToast("Session expired. Please log in again.", "error");
+        setTimeout(() => { logout(); navigate("/"); }, 2000);
+      } else {
+        // Network error, server error, CORS etc. — don't log out
+        showToast("Could not load playlists. Check your connection.", "error");
+        setLoading(false);
+      }
     } finally {
       setLoading(false);
     }

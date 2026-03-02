@@ -3,11 +3,24 @@ const API_URL = `${import.meta.env.VITE_API_URL}/api/playlists`;
 export const getPlaylists = async () => {
   const token = localStorage.getItem("token");
 
-  const res = await fetch(API_URL, {
-    headers: { Authorization: `Bearer ${token}` },
-  });
+  let res;
+  try {
+    res = await fetch(API_URL, {
+      headers: { Authorization: `Bearer ${token}` },
+    });
+  } catch (networkErr) {
+    // Network/CORS failure — NOT a session issue
+    const err = new Error("Network error — check your connection");
+    err.status = 0;
+    throw err;
+  }
 
-  if (!res.ok) throw new Error("Failed to fetch playlists");
+  if (!res.ok) {
+    const err = new Error("Failed to fetch playlists");
+    err.status = res.status; // 401, 403, 500 etc.
+    throw err;
+  }
+
   return res.json();
 };
 

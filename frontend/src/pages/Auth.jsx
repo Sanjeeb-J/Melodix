@@ -1,13 +1,16 @@
-import { useState } from "react";
+import { useState, useContext } from "react";
 import { loginUser, registerUser } from "../services/authService";
 import { useNavigate } from "react-router-dom";
 import { Mail, Lock, Eye, EyeOff, User, Loader2, CheckCircle2, Music2 } from "lucide-react";
+import { AuthContext } from "../context/AuthContext";
 
 function Auth() {
   const [isLogin, setIsLogin] = useState(true);
   const [showPassword, setShowPassword] = useState(false);
   const [status, setStatus] = useState("idle");
+  const [errorMsg, setErrorMsg] = useState("");
   const navigate = useNavigate();
+  const { login } = useContext(AuthContext);
 
   const [loginData, setLoginData] = useState({ email: "", password: "" });
   const [registerData, setRegisterData] = useState({ name: "", email: "", password: "" });
@@ -15,14 +18,15 @@ function Auth() {
   const handleLogin = async (e) => {
     e.preventDefault();
     setStatus("loading");
+    setErrorMsg("");
     try {
       const res = await loginUser(loginData);
-      localStorage.setItem("token", res.token);
+      login(res.token); // sets both localStorage AND AuthContext state
       setStatus("success");
-      setTimeout(() => navigate("/dashboard"), 800);
+      setTimeout(() => navigate("/dashboard"), 600);
     } catch (err) {
       setStatus("idle");
-      alert(err.message || "Login failed");
+      setErrorMsg(err.message || "Invalid email or password");
     }
   };
 
@@ -128,6 +132,10 @@ function Auth() {
             {status === "success" && <CheckCircle2 size={18} />}
             {status === "idle" && (isLogin ? "Log In" : "Sign Up")}
           </button>
+
+          {errorMsg && (
+            <p className="text-red-400 text-sm text-center font-medium">{errorMsg}</p>
+          )}
         </form>
 
         <div className="mt-6 pt-6 border-t border-[rgba(255,255,255,0.08)] text-center">
