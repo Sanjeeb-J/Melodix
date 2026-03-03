@@ -13,71 +13,44 @@ function cacheGet(videoId) {
   return entry;
 }
 
-function cacheSet(videoId, entry) {
+function cacheSet(videoId, data) {
   if (audioCache.size >= MAX_CACHE_SIZE) {
     const oldest = audioCache.keys().next().value;
     audioCache.delete(oldest);
     console.log(`[Cache] Evicted: ${oldest}`);
   }
-  audioCache.set(videoId, entry);
+  audioCache.set(videoId, data);
   console.log(
-    `[Cache] Stored ${videoId} (${(entry.buffer.length / 1024 / 1024).toFixed(1)} MB). Size: ${audioCache.size}/${MAX_CACHE_SIZE}`
+    `[Stream] Cached ${videoId} (${(data.buffer.length / 1024 / 1024).toFixed(1)} MB). Cache size: ${audioCache.size}`
   );
 }
 
-// ─── Fetch audio into a Buffer from a direct URL ───────────────────────────
-function fetchBuffer(url) {
-  return new Promise((resolve, reject) => {
-    const chunks = [];
-    const makeRequest = (targetUrl) => {
-      const transport = targetUrl.startsWith("https") ? https : http;
-      transport.get(
-        targetUrl,
-        {
-          headers: {
-            "User-Agent":
-              "com.google.android.youtube/17.31.35 (Linux; U; Android 11) gzip",
-            Referer: "https://www.youtube.com/",
-          },
-        },
-        (res) => {
-          if (
-            [301, 302, 303, 307, 308].includes(res.statusCode) &&
-            res.headers.location
-          ) {
-            makeRequest(res.headers.location);
-            return;
-          }
-          if (res.statusCode !== 200 && res.statusCode !== 206) {
-            reject(new Error(`Upstream returned ${res.statusCode}`));
-            return;
-          }
-          const contentType = res.headers["content-type"] || "audio/mp4";
-          res.on("data", (c) => chunks.push(c));
-          res.on("end", () =>
-            resolve({ buffer: Buffer.concat(chunks), contentType: contentType.split(";")[0] })
-          );
-          res.on("error", reject);
-        }
-      ).on("error", reject);
-    };
-    makeRequest(url);
-  });
+// ─── Convert WHATWG ReadableStream → Node.js Buffer ─────────────────────────
+async function readableStreamToBuffer(readableStream) {
+  const chunks = [];
+  const reader = readableStream.getReader();
+  try {
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      if (value) chunks.push(Buffer.from(value));
+    }
+  } finally {
+    reader.releaseLock();
+  }
+  return Buffer.concat(chunks);
 }
 
-// ─── Innertube singleton (lazy loaded as ESM) ───────────────────────────────
-let innertubeInstance = null;
+// ─── Innertube singleton per container ──────────────────────────────────────
+let ytInstance = null;
 
-async function getInnertube() {
-  if (!innertubeInstance) {
-    // Dynamic import because youtubei.js is ESM-only
+async function getYT() {
+  if (!ytInstance) {
     const { Innertube } = await import("youtubei.js");
-    innertubeInstance = await Innertube.create({
-      retrieve_player: true,
-      generate_session_locally: true,
-    });
+    ytInstance = await Innertube.create({ retrieve_player: true });
+    console.log("[Stream] Innertube initialized");
   }
-  return innertubeInstance;
+  return ytInstance;
 }
 
 // ─── Controller ─────────────────────────────────────────────────────────────
@@ -86,38 +59,32 @@ const streamAudio = async (req, res) => {
   if (!videoId) return res.status(400).json({ message: "videoId is required" });
 
   try {
+    // ── Cache hit ──────────────────────────────────────────────────────────
     let entry = cacheGet(videoId);
 
     if (entry) {
       console.log(`[Cache] HIT for ${videoId}`);
     } else {
-      console.log(`[Stream] Fetching info for ${videoId}...`);
-      const yt = await getInnertube();
+      // ── Extract and download audio ────────────────────────────────────────
+      console.log(`[Stream] Downloading audio for ${videoId}...`);
+      const yt = await getYT();
 
-      // getInfo with ANDROID client gives direct (non-throttled) URLs
-      const info = await yt.getInfo(videoId, "ANDROID");
-
-      // Pick best audio-only format
-      const format = info.chooseFormat({
-        quality: "best",
+      const stream = await yt.download(videoId, {
         type: "audio",
+        quality: "best",
         format: "any",
       });
 
-      if (!format) throw new Error("No audio format found");
-
-      // Try direct URL first, otherwise decipher
-      let audioUrl = format.url;
-      if (!audioUrl && yt.session.player) {
-        audioUrl = format.decipher(yt.session.player);
+      const buffer = await readableStreamToBuffer(stream);
+      if (!buffer || buffer.length === 0) {
+        throw new Error("Downloaded audio is empty");
       }
-      if (!audioUrl) throw new Error("Could not resolve audio URL");
 
-      console.log(`[Stream] Downloading audio for ${videoId} (${format.audio_quality})...`);
-      entry = await fetchBuffer(audioUrl);
+      entry = { buffer, contentType: "audio/mp4" };
       cacheSet(videoId, entry);
     }
 
+    // ── Serve buffer with Range support ──────────────────────────────────────
     const { buffer, contentType } = entry;
     const total = buffer.length;
     const rangeHeader = req.headers.range;
@@ -125,10 +92,17 @@ const streamAudio = async (req, res) => {
     if (rangeHeader) {
       const [s, e] = rangeHeader.replace(/bytes=/, "").split("-");
       const start = parseInt(s, 10);
-      const end = e ? parseInt(e, 10) : Math.min(start + 1024 * 1024, total - 1);
+      const end = e
+        ? parseInt(e, 10)
+        : Math.min(start + 1024 * 1024, total - 1);
+
       if (start >= total) {
-        return res.status(416).setHeader("Content-Range", `bytes */${total}`).end();
+        return res
+          .status(416)
+          .setHeader("Content-Range", `bytes */${total}`)
+          .end();
       }
+
       res.writeHead(206, {
         "Content-Range": `bytes ${start}-${end}/${total}`,
         "Accept-Ranges": "bytes",
