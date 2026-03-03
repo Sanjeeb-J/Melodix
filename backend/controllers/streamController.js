@@ -1,6 +1,11 @@
 const youtubedl = require("youtube-dl-exec");
+const fs = require("fs");
 const https = require("https");
 const http = require("http");
+
+// Use system yt-dlp if it exists (for Docker), otherwise let the package handle it
+const binaryPath = fs.existsSync("/usr/local/bin/yt-dlp") ? "/usr/local/bin/yt-dlp" : undefined;
+const ydl = binaryPath ? youtubedl.create(binaryPath) : youtubedl;
 
 // ─── 10-song LRU Cache ──────────────────────────────────────────────────────
 const MAX_CACHE_SIZE = 10;
@@ -85,7 +90,7 @@ const streamAudio = async (req, res) => {
     } else {
       console.log(`[Stream] Extracting URL for ${videoId}...`);
       
-      const output = await youtubedl(`https://www.youtube.com/watch?v=${videoId}`, {
+      const output = await ydl(`https://www.youtube.com/watch?v=${videoId}`, {
         dumpSingleJson: true,
         noCheckCertificates: true,
         noWarnings: true,

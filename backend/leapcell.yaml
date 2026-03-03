@@ -3,6 +3,7 @@ services:
   melodix-backend:
     type: "api"
     runtime: "docker"
+    command: "node index.js"
     env:
       - PORT=8080
       - NODE_ENV=production
