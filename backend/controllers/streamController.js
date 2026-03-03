@@ -1,47 +1,9 @@
-const { Readable } = require("stream");
 const ffmpeg = require("fluent-ffmpeg");
 const ffmpegStatic = require("ffmpeg-static");
+const ytdl = require("@distube/ytdl-core");
 
 // Set ffmpeg path
 ffmpeg.setFfmpegPath(ffmpegStatic);
-
-// ─── Innertube singleton per container ──────────────────────────────────────
-let ytInstance = null;
-
-async function getYT() {
-  if (!ytInstance) {
-    const { Innertube } = await import("youtubei.js");
-    ytInstance = await Innertube.create({ 
-      retrieve_player: true,
-      generate_session_locally: true 
-    });
-    console.log("[Stream] Innertube initialized");
-  }
-  return ytInstance;
-}
-
-// ─── Convert WHATWG ReadableStream → Node.js Readable Stream ─────────────────
-function webStreamToNodeStream(webStream) {
-  const reader = webStream.getReader();
-  return new Readable({
-    async read() {
-      try {
-        const { done, value } = await reader.read();
-        if (done) {
-          this.push(null);
-        } else {
-          this.push(Buffer.from(value));
-        }
-      } catch (err) {
-        this.destroy(err);
-      }
-    },
-    destroy(err, callback) {
-      reader.cancel();
-      callback(err);
-    },
-  });
-}
 
 // ─── Controller ─────────────────────────────────────────────────────────────
 const streamAudio = async (req, res) => {
@@ -50,22 +12,21 @@ const streamAudio = async (req, res) => {
 
   try {
     console.log(`[Stream] Proxying and transcoding audio for ${videoId}...`);
-    const yt = await getYT();
-
-    // The download API provides an optimized WHATWG stream.
-    // Using ANDROID client bypasses the "Video is login required" / age-restriction block
-    const webStream = await yt.download(videoId, {
-      type: "audio",
-      quality: "best",
-      format: "mp4", // Requesting mp4 gives m4a (aac) from YouTube
-      client: "YTMUSIC",
+    
+    const url = `https://www.youtube.com/watch?v=${videoId}`;
+    
+    // ytdl-core automatically handles deciphering, client spoofing, and format selection
+    const audioStream = ytdl(url, {
+      filter: "audioonly",
+      quality: "highestaudio",
     });
 
-    if (!webStream) {
-      throw new Error("Unable to obtain standard audio stream.");
-    }
-
-    const nodeStream = webStreamToNodeStream(webStream);
+    audioStream.on('error', (err) => {
+      console.error(`[ytdl-core] Stream error for ${videoId}:`, err.message);
+      if (!res.headersSent) {
+         res.status(500).json({ message: "Error opening video stream", error: err.message });
+      }
+    });
 
     res.writeHead(200, {
       "Content-Type": "audio/mpeg", // Send actual MP3 header
@@ -74,10 +35,9 @@ const streamAudio = async (req, res) => {
     });
 
     // We transcode to MP3 on the fly so the browser <audio> tag never throws a format error
-    const command = ffmpeg(nodeStream)
+    const command = ffmpeg(audioStream)
       .format("mp3")
       .audioCodec("libmp3lame")
-      // .audioBitrate(128)
       .on("error", (err) => {
         // Suppress "Output stream closed" errors on client disconnect
         if (!err.message.includes("Output stream closed")) {
@@ -96,7 +56,7 @@ const streamAudio = async (req, res) => {
       try {
         command.kill("SIGKILL"); // Kill FFmpeg process if client disconnects early
       } catch (e) {}
-      nodeStream.destroy();
+      audioStream.destroy();
     });
 
   } catch (err) {
@@ -108,3 +68,4 @@ const streamAudio = async (req, res) => {
 };
 
 module.exports = { streamAudio };
+
