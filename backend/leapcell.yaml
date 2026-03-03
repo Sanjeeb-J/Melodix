@@ -3,7 +3,7 @@ services:
   melodix-backend:
     type: "api"
     runtime: "nodejs20"
-    build: "cd backend && YOUTUBE_DL_SKIP_PYTHON_CHECK=1 npm install"
+    build: "cd backend && npm install"
     command: "node backend/index.js"
     env:
       - NODE_ENV=production

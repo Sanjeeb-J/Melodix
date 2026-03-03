@@ -11,8 +11,9 @@ const streamRoutes = require("./routes/streamRoutes");
 
 const app = express();
 
-// Connect to DB
-connectDB();
+// Connect to DB then start server
+async function startServer() {
+  await connectDB(); // ensure DB connects before accepting requests
 
 const corsOptions = {
   origin: "*",
@@ -36,8 +37,14 @@ app.get("/", (req, res) => {
   res.send("Melodix API running");
 });
 
-const PORT = process.env.PORT || 5000 ;
+const PORT = process.env.PORT || 8080;
 
-app.listen(PORT, "0.0.0.0", () => {
-  console.log(`Server running on port ${PORT}`);
+  app.listen(PORT, "0.0.0.0", () => {
+    console.log(`Server running on port ${PORT}`);
+  });
+}
+
+startServer().catch((err) => {
+  console.error("Failed to start server:", err);
+  process.exit(1);
 });
