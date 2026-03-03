@@ -8,7 +8,10 @@ const connectDB = async () => {
       return;
     }
     console.log("[DB] Connecting to MongoDB...");
-    await mongoose.connect(mongoUri);
+    await mongoose.connect(mongoUri, {
+      serverSelectionTimeoutMS: 5000,
+      bufferCommands: false,
+    });
     console.log("MongoDB Connected ✓");
   } catch (error) {
     // Don't crash the server — streaming works without DB
