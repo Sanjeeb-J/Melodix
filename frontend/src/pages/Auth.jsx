@@ -3,6 +3,7 @@ import { loginUser, registerUser } from "../services/authService";
 import { useNavigate } from "react-router-dom";
 import { Mail, Lock, Eye, EyeOff, User, Loader2, CheckCircle2, Music2 } from "lucide-react";
 import { AuthContext } from "../context/AuthContext";
+import logo from "../assets/logo.png";
 
 function Auth() {
   const [isLogin, setIsLogin] = useState(true);
@@ -63,11 +64,14 @@ function Auth() {
         style={{ background: "rgba(18,18,18,0.95)", backdropFilter: "blur(24px)", border: "1px solid rgba(255,255,255,0.08)" }}
       >
         {/* Logo */}
-        <div className="flex flex-col items-center mb-8">
-          <div className="w-10 h-10 bg-sp-green rounded-full flex items-center justify-center mb-4">
-            <Music2 size={20} className="text-black" />
-          </div>
-          <h1 className="text-2xl font-black tracking-tight text-white">
+        <div className="flex flex-col items-center mb-8 gap-4">
+          <button
+            onClick={() => navigate("/")}
+            className="w-16 h-16 rounded-full overflow-hidden flex items-center justify-center hover:scale-105 transition-transform"
+          >
+            <img src={logo} alt="Melodix Logo" className="w-full h-full object-cover" />
+          </button>
+          <h1 className="text-2xl font-black tracking-tight text-white hover:text-sp-green transition-colors cursor-pointer" onClick={() => navigate("/")}>
             {isLogin ? "Log in to Melodix" : "Sign up for free"}
           </h1>
         </div>

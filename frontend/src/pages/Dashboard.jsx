@@ -4,6 +4,7 @@ import { useContext } from "react";
 import { AuthContext } from "../context/AuthContext";
 import { usePlayer } from "../context/PlayerContext";
 import { useToast } from "../components/ToastContainer";
+import logo from "../assets/logo.png";
 import {
   getPlaylists,
   createPlaylist,
@@ -246,12 +247,15 @@ function Sidebar({
         style={{ background: "#121212" }}
       >
         {/* Logo */}
-        <div className="flex items-center gap-2 text-white font-black text-xl">
-          <div className="w-8 h-8 bg-sp-green rounded-full flex items-center justify-center">
-            <Music2 size={16} className="text-black" />
+        <button
+          onClick={() => setView("home")}
+          className="flex items-center gap-2 text-white font-black text-xl hover:scale-[1.02] transition-transform text-left"
+        >
+          <div className="w-10 h-10 rounded-full overflow-hidden flex items-center justify-center bg-sp-green">
+            <img src={logo} alt="" className="w-full h-full object-cover" />
           </div>
           Melodix
-        </div>
+        </button>
 
         <div className="flex flex-col gap-1">
           <button
@@ -1214,10 +1218,13 @@ export default function Dashboard() {
             >
               <Menu size={24} />
             </button>
-            <div className="ml-4 flex-1 flex items-center gap-2 font-black text-white">
-               <Music2 size={24} className="text-sp-green" />
+            <button
+              onClick={() => setView("home")}
+              className="ml-4 flex-1 flex items-center gap-2 font-black text-white hover:text-sp-green transition-colors"
+            >
+               <img src={logo} alt="" className="w-8 h-8 rounded-full object-cover" />
                Melodix
-            </div>
+            </button>
             <button
               onClick={handleLogout}
               className="text-sp-dim hover:text-white transition-colors"
