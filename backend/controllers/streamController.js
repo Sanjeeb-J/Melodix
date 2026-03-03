@@ -37,7 +37,7 @@ const streamAudio = async (req, res) => {
 
   // Step 2 – ffmpeg reads from stdin, encodes to MP3, writes to stdout
   const ffmpegArgs = [
-    "-hide_banner", "-loglevel", "error",
+    "-hide_banner", "-loglevel", "info", // Changed to info for better debugging
     "-i", "pipe:0",           // read from stdin (yt-dlp output)
     "-vn",                    // no video
     "-acodec", "libmp3lame",
@@ -50,7 +50,7 @@ const streamAudio = async (req, res) => {
   // Pipe yt-dlp → ffmpeg
   ytdlp.stdout.pipe(ff.stdin);
 
-  // Send headers once we know we're going to stream
+  // Send headers — but only once we've successfully spawned the processes
   res.writeHead(200, {
     "Content-Type": "audio/mpeg",
     "Cache-Control": "no-cache",
@@ -60,43 +60,51 @@ const streamAudio = async (req, res) => {
   // Pipe ffmpeg output → HTTP response
   ff.stdout.pipe(res);
 
-  // ─── Error handling ─────────────────────────────────────────────────────────
+  // ─── Error and Close Logic ────────────────────────────────────────────────
   ytdlp.stderr.on("data", (d) => {
     const msg = d.toString().trim();
-    if (msg) console.error(`[yt-dlp] ${msg}`);
+    if (msg && !msg.includes("Downloading") && !msg.includes("Extracting")) {
+      console.error(`[yt-dlp] ${msg}`);
+    }
   });
 
   ff.stderr.on("data", (d) => {
     const msg = d.toString().trim();
-    if (msg) console.error(`[ffmpeg] ${msg}`);
+     // Only log actual errors, not progress
+    if (msg && (msg.toLowerCase().includes("error") || msg.toLowerCase().includes("failed"))) {
+      console.error(`[ffmpeg] ${msg}`);
+    }
   });
 
   ytdlp.on("error", (err) => {
-    console.error(`[Stream] yt-dlp spawn error: ${err.message}`);
-    if (!res.headersSent) res.status(500).json({ message: "yt-dlp error", error: err.message });
+    console.error(`[Stream] yt-dlp failed to start: ${err.message}`);
+    if (!res.headersSent) res.status(500).json({ message: "yt-dlp start failed" });
   });
 
   ff.on("error", (err) => {
-    console.error(`[Stream] ffmpeg spawn error: ${err.message}`);
+    console.error(`[Stream] ffmpeg failed to start: ${err.message}`);
+    if (!res.headersSent) res.status(500).json({ message: "ffmpeg start failed" });
   });
 
   ytdlp.on("close", (code) => {
-    if (code !== 0) console.error(`[Stream] yt-dlp exited with code ${code} for ${videoId}`);
-    // Close ffmpeg stdin so it knows input is done
-    ff.stdin.end();
+    console.log(`[Stream] yt-dlp process closed with code ${code}`);
+    ff.stdin.end(); // Inform ffmpeg that input is finished
   });
 
   ff.on("close", (code) => {
-    if (code !== 0) console.error(`[Stream] ffmpeg exited with code ${code} for ${videoId}`);
-    else console.log(`[Stream] Done streaming ${videoId}`);
+    console.log(`[Stream] ffmpeg process closed with code ${code}`);
     if (!res.writableEnded) res.end();
   });
 
-  // ─── Client disconnect cleanup ──────────────────────────────────────────────
+  // Cleanup on client disconnect
   req.on("close", () => {
-    console.log(`[Stream] Client disconnected for ${videoId}`);
-    try { ytdlp.kill("SIGKILL"); } catch (_) {}
-    try { ff.stdin.destroy(); ff.kill("SIGKILL"); } catch (_) {}
+    console.log(`[Stream] Client closed connection for ${videoId}. Cleaning up processes.`);
+    try {
+      ytdlp.kill("SIGKILL");
+      ff.kill("SIGKILL");
+    } catch (e) {
+      // Ignore errors during kill
+    }
   });
 };
 

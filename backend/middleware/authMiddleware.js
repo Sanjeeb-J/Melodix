@@ -22,7 +22,15 @@ const protect = async (req, res, next) => {
 
   try {
     const decoded = jwt.verify(token, process.env.JWT_SECRET || "melodix_super_secret_2026");
-    req.user = await User.findById(decoded.id).select("-password");
+    
+    // Attempt to load the user, but don't fail if the database is down
+    try {
+      req.user = await User.findById(decoded.id).select("-password");
+    } catch (dbError) {
+      console.warn("[Auth] Database error during user lookup — proceeding with token data only.");
+      req.user = { id: decoded.id, name: "Guest User" }; // Minimal user object to support streaming
+    }
+    
     next();
   } catch (error) {
     return res.status(401).json({ message: "Not authorized, token failed" });
