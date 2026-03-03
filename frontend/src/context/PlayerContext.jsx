@@ -20,6 +20,7 @@ export const PlayerProvider = ({ children }) => {
   const [duration, setDuration] = useState(0);
   const [currentTime, setCurrentTime] = useState(0);
   const [isLoading, setIsLoading] = useState(false);
+  const [loadingMessage, setLoadingMessage] = useState("");
 
 
   // Play a song, optionally with a queue context
@@ -135,7 +136,10 @@ export const PlayerProvider = ({ children }) => {
   // When currentSong changes, load it
   useEffect(() => {
     if (!currentSong || !audioRef.current) return;
-    const src = getStreamUrl(currentSong.videoId || currentSong.youtubeId);
+    const videoId = currentSong.videoId || currentSong.youtubeId;
+    setLoadingMessage("Downloading audio…");
+    setIsLoading(true);
+    const src = getStreamUrl(videoId);
     audioRef.current.src = src;
     audioRef.current.volume = volume;
     audioRef.current.play().catch(() => {});
@@ -166,6 +170,7 @@ export const PlayerProvider = ({ children }) => {
     };
     const onCanPlay = () => {
       setIsLoading(false);
+      setLoadingMessage("");
       if (isPlaying) audio.play().catch(() => {});
     };
     const onPlay = () => setIsPlaying(true);
@@ -173,6 +178,7 @@ export const PlayerProvider = ({ children }) => {
     const onError = (e) => {
       console.error("[Player] Audio error:", audio.error?.message || e);
       setIsLoading(false);
+      setLoadingMessage("");
       setIsPlaying(false);
     };
 
@@ -208,6 +214,7 @@ export const PlayerProvider = ({ children }) => {
         duration,
         currentTime,
         isLoading,
+        loadingMessage,
         queue,
         playSong,
         togglePlay,

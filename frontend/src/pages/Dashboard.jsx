@@ -65,6 +65,7 @@ function PlayerBar() {
     duration,
     currentTime,
     isLoading,
+    loadingMessage,
     togglePlay,
     nextSong,
     prevSong,
@@ -111,6 +112,13 @@ function PlayerBar() {
 
       {/* Center: controls */}
       <div className="flex flex-col items-center gap-2 w-full md:w-[40%]">
+        {/* Loading message when downloading */}
+        {isLoading && loadingMessage && (
+          <div className="flex items-center gap-2 text-xs text-sp-green animate-pulse font-medium">
+            <Loader2 size={12} className="animate-spin" />
+            {loadingMessage}
+          </div>
+        )}
         <div className="flex items-center gap-3 md:gap-5">
           <button
             onClick={toggleShuffle}
