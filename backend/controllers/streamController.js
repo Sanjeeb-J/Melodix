@@ -11,7 +11,10 @@ let ytInstance = null;
 async function getYT() {
   if (!ytInstance) {
     const { Innertube } = await import("youtubei.js");
-    ytInstance = await Innertube.create({ retrieve_player: true });
+    ytInstance = await Innertube.create({ 
+      retrieve_player: true,
+      generate_session_locally: true 
+    });
     console.log("[Stream] Innertube initialized");
   }
   return ytInstance;
