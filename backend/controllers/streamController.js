@@ -1,4 +1,9 @@
 const { Readable } = require("stream");
+const ffmpeg = require("fluent-ffmpeg");
+const ffmpegStatic = require("ffmpeg-static");
+
+// Set ffmpeg path
+ffmpeg.setFfmpegPath(ffmpegStatic);
 
 // ─── Innertube singleton per container ──────────────────────────────────────
 let ytInstance = null;
@@ -41,15 +46,14 @@ const streamAudio = async (req, res) => {
   if (!videoId) return res.status(400).json({ message: "videoId is required" });
 
   try {
-    console.log(`[Stream] Proxying audio stream for ${videoId}...`);
+    console.log(`[Stream] Proxying and transcoding audio for ${videoId}...`);
     const yt = await getYT();
 
     // The download API provides an optimized WHATWG stream.
-    // It automatically handles URL extraction, ciphers, and bot detection bypass.
     const webStream = await yt.download(videoId, {
       type: "audio",
       quality: "best",
-      format: "mp4", // Requesting mp4 gives m4a (aac) which is broadly supported
+      format: "mp4", // Requesting mp4 gives m4a (aac) from YouTube
     });
 
     if (!webStream) {
@@ -59,15 +63,34 @@ const streamAudio = async (req, res) => {
     const nodeStream = webStreamToNodeStream(webStream);
 
     res.writeHead(200, {
-      "Content-Type": "audio/mp4",
+      "Content-Type": "audio/mpeg", // Send actual MP3 header
       "Cache-Control": "no-cache",
-      // Transfer-Encoding chunked is handled automatically by pipe()
+      "Transfer-Encoding": "chunked", // Required for continuous streaming
     });
 
-    nodeStream.pipe(res);
+    // We transcode to MP3 on the fly so the browser <audio> tag never throws a format error
+    const command = ffmpeg(nodeStream)
+      .format("mp3")
+      .audioCodec("libmp3lame")
+      // .audioBitrate(128)
+      .on("error", (err) => {
+        // Suppress "Output stream closed" errors on client disconnect
+        if (!err.message.includes("Output stream closed")) {
+          console.error(`[FFmpeg] Error transcoding ${videoId}:`, err.message);
+        }
+      })
+      .on("end", () => {
+        console.log(`[Stream] Finished streaming ${videoId}`);
+      });
+
+    // Pipe the transcoded MP3 stream directly to the response
+    command.pipe(res, { end: true });
 
     req.on("close", () => {
       console.log(`[Stream] Client disconnected for ${videoId}`);
+      try {
+        command.kill("SIGKILL"); // Kill FFmpeg process if client disconnects early
+      } catch (e) {}
       nodeStream.destroy();
     });
 
