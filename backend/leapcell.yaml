@@ -1,0 +1,9 @@
+version: "1"
+services:
+  melodix-backend:
+    type: "api"
+    runtime: "nodejs"
+    build: "npm install"
+    command: "npm start"
+    env:
+      - PORT=5000

@@ -1,32 +1,6 @@
-const axios = require("axios");
+const youtubedl = require("youtube-dl-exec");
 const https = require("https");
 const http = require("http");
-
-// ─── Piped.video public instances (tried in order as fallback) ─────────────
-const PIPED_INSTANCES = [
-  "https://pipedapi.kavin.rocks",
-  "https://api.piped.yt",
-  "https://pipedapi.bocchi.rocks",
-  "https://piped-api.garudalinux.org",
-];
-
-async function getPipedAudioUrl(videoId) {
-  for (const base of PIPED_INSTANCES) {
-    try {
-      const { data } = await axios.get(`${base}/streams/${videoId}`, {
-        timeout: 8000,
-      });
-      const streams = (data.audioStreams || []).sort((a, b) => b.bitrate - a.bitrate);
-      if (streams[0]?.url) {
-        console.log(`[Piped] Got audio URL from ${base}`);
-        return { url: streams[0].url, contentType: streams[0].mimeType || "audio/webm" };
-      }
-    } catch (err) {
-      console.warn(`[Piped] ${base} failed: ${err.message}`);
-    }
-  }
-  throw new Error("All Piped instances failed — video may be unavailable.");
-}
 
 // ─── 10-song LRU Cache ──────────────────────────────────────────────────────
 const MAX_CACHE_SIZE = 10;
@@ -78,7 +52,7 @@ function fetchBuffer(url, contentType) {
             .catch(reject);
           return;
         }
-        if (res.statusCode !== 200) {
+        if (res.statusCode !== 200 && res.statusCode !== 206) {
           reject(new Error(`Upstream returned ${res.statusCode}`));
           return;
         }
@@ -91,7 +65,7 @@ function fetchBuffer(url, contentType) {
     );
 
     req.on("error", reject);
-    req.setTimeout(30000, () => {
+    req.setTimeout(60000, () => {
       req.destroy();
       reject(new Error("Download timed out"));
     });
@@ -109,9 +83,30 @@ const streamAudio = async (req, res) => {
     if (entry) {
       console.log(`[Cache] HIT for ${videoId}`);
     } else {
-      console.log(`[Stream] Fetching audio for ${videoId}...`);
-      const { url, contentType } = await getPipedAudioUrl(videoId);
-      entry = await fetchBuffer(url, contentType);
+      console.log(`[Stream] Extracting URL for ${videoId}...`);
+      
+      const output = await youtubedl(`https://www.youtube.com/watch?v=${videoId}`, {
+        dumpSingleJson: true,
+        noCheckCertificates: true,
+        noWarnings: true,
+        preferFreeFormats: true,
+        addHeader: [
+          'referer:https://www.youtube.com/',
+          'user-agent:Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'
+        ]
+      });
+
+      // Find best audio-only format
+      const audioFormat = output.formats
+        .filter(f => f.vcodec === 'none' && f.acodec !== 'none')
+        .sort((a, b) => (b.abr || 0) - (a.abr || 0))[0];
+
+      if (!audioFormat || !audioFormat.url) {
+        throw new Error("No suitable audio format found");
+      }
+
+      console.log(`[Stream] Downloading audio for ${videoId}...`);
+      entry = await fetchBuffer(audioFormat.url, audioFormat.ext === 'm4a' ? 'audio/mp4' : 'audio/webm');
       cacheSet(videoId, entry);
     }
 
