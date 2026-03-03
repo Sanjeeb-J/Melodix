@@ -4,19 +4,16 @@ const connectDB = async () => {
   try {
     const mongoUri = process.env.MONGO_URI;
     if (!mongoUri) {
-      throw new Error("MONGO_URI is missing from .env file");
+      console.warn("[DB] MONGO_URI missing — database features (auth, playlists) will be unavailable.");
+      return;
     }
-    
+    console.log("[DB] Connecting to MongoDB...");
     await mongoose.connect(mongoUri);
-    console.log("MongoDB Connected");
+    console.log("MongoDB Connected ✓");
   } catch (error) {
-    if (error.message.includes("ECONNREFUSED")) {
-      console.error("CRITICAL ERROR: Could not connect to local MongoDB.");
-      console.error("FIX: Please start your MongoDB service (e.g. `brew services start mongodb-community` OR ensure your Docker/Windows MongoDB service is running).");
-    } else {
-      console.error("MongoDB Connection Error:", error.message);
-    }
-    process.exit(1);
+    // Don't crash the server — streaming works without DB
+    console.error("[DB] MongoDB connection failed:", error.message);
+    console.warn("[DB] Database features disabled. Audio streaming still works.");
   }
 };
 

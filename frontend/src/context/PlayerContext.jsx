@@ -133,20 +133,65 @@ export const PlayerProvider = ({ children }) => {
     return () => window.removeEventListener("keydown", handleKeyDown);
   }, [togglePlay, nextSong, prevSong, toggleRepeat, toggleShuffle, toggleMute]);
 
-  // When currentSong changes, load it
+  // Track current blob URL to revoke on song change
+  const blobUrlRef = useRef(null);
+
+  // When currentSong changes, fetch audio as blob then play
   useEffect(() => {
     if (!currentSong || !audioRef.current) return;
     const videoId = currentSong.videoId || currentSong.youtubeId;
-    setLoadingMessage("Downloading audio…");
+    if (!videoId) return;
+
     setIsLoading(true);
-    const src = getStreamUrl(videoId);
-    audioRef.current.src = src;
-    audioRef.current.volume = volume;
-    audioRef.current.play().catch(() => {});
     setProgress(0);
     setCurrentTime(0);
     setDuration(0);
+
+    // Stop any existing playback
+    audioRef.current.pause();
+    if (blobUrlRef.current) {
+      URL.revokeObjectURL(blobUrlRef.current);
+      blobUrlRef.current = null;
+    }
+    audioRef.current.src = "";
+
+    let cancelled = false;
+
+    const fetchAudio = async () => {
+      try {
+        const streamUrl = getStreamUrl(videoId);
+        const response = await fetch(streamUrl);
+        if (!response.ok) throw new Error(`HTTP ${response.status}`);
+        if (cancelled) return;
+
+        const blob = await response.blob();
+        if (cancelled) return;
+
+        const blobUrl = URL.createObjectURL(blob);
+        blobUrlRef.current = blobUrl;
+
+        if (audioRef.current) {
+          audioRef.current.src = blobUrl;
+          audioRef.current.volume = volume;
+          audioRef.current.load();
+          audioRef.current.play().catch(() => {});
+        }
+      } catch (err) {
+        if (!cancelled) {
+          console.error("[Player] Failed to fetch audio:", err.message);
+          setIsLoading(false);
+          setIsPlaying(false);
+        }
+      }
+    };
+
+    fetchAudio();
+
+    return () => {
+      cancelled = true;
+    };
   }, [currentSong?.videoId, currentSong?.youtubeId]);
+
 
   // Audio event listeners
   useEffect(() => {

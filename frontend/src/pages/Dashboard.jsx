@@ -112,13 +112,6 @@ function PlayerBar() {
 
       {/* Center: controls */}
       <div className="flex flex-col items-center gap-2 w-full md:w-[40%]">
-        {/* Loading message when downloading */}
-        {isLoading && loadingMessage && (
-          <div className="flex items-center gap-2 text-xs text-sp-green animate-pulse font-medium">
-            <Loader2 size={12} className="animate-spin" />
-            {loadingMessage}
-          </div>
-        )}
         <div className="flex items-center gap-3 md:gap-5">
           <button
             onClick={toggleShuffle}
@@ -384,10 +377,13 @@ function HomeView({ playlists, onPlaylistClick, onCreatePlaylist }) {
       {playlists.length > 0 && (
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 mb-8">
           {playlists.slice(0, 6).map((p) => (
-            <button
+            <div
               key={p._id}
               onClick={() => onPlaylistClick(p)}
-              className="flex items-center gap-3 bg-[rgba(255,255,255,0.07)] hover:bg-[rgba(255,255,255,0.12)] rounded-md overflow-hidden text-left transition-all group relative"
+              role="button"
+              tabIndex={0}
+              onKeyDown={(e) => e.key === "Enter" && onPlaylistClick(p)}
+              className="flex items-center gap-3 bg-[rgba(255,255,255,0.07)] hover:bg-[rgba(255,255,255,0.12)] rounded-md overflow-hidden text-left transition-all group relative cursor-pointer"
             >
               <div className="w-14 h-14 flex-shrink-0">
                 {p.songs?.length > 0 ? (
@@ -403,7 +399,7 @@ function HomeView({ playlists, onPlaylistClick, onCreatePlaylist }) {
               >
                 <Play size={18} fill="black" className="text-black ml-0.5" />
               </button>
-            </button>
+            </div>
           ))}
         </div>
       )}

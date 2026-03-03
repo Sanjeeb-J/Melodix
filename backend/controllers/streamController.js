@@ -1,99 +1,138 @@
-const ytdl = require("@distube/ytdl-core");
+const axios = require("axios");
+const https = require("https");
+const http = require("http");
 
-// ─── 10-song LRU Cache ─────────────────────────────────────────────────────
+// ─── Piped.video public instances (tried in order as fallback) ─────────────
+const PIPED_INSTANCES = [
+  "https://pipedapi.kavin.rocks",
+  "https://api.piped.yt",
+  "https://pipedapi.bocchi.rocks",
+  "https://piped-api.garudalinux.org",
+];
+
+async function getPipedAudioUrl(videoId) {
+  for (const base of PIPED_INSTANCES) {
+    try {
+      const { data } = await axios.get(`${base}/streams/${videoId}`, {
+        timeout: 8000,
+      });
+      const streams = (data.audioStreams || []).sort((a, b) => b.bitrate - a.bitrate);
+      if (streams[0]?.url) {
+        console.log(`[Piped] Got audio URL from ${base}`);
+        return { url: streams[0].url, contentType: streams[0].mimeType || "audio/webm" };
+      }
+    } catch (err) {
+      console.warn(`[Piped] ${base} failed: ${err.message}`);
+    }
+  }
+  throw new Error("All Piped instances failed — video may be unavailable.");
+}
+
+// ─── 10-song LRU Cache ──────────────────────────────────────────────────────
 const MAX_CACHE_SIZE = 10;
-// key: videoId, value: { buffer: Buffer, contentType: string }
-const audioCache = new Map();
+const audioCache = new Map(); // key: videoId, value: { buffer, contentType }
 
 function cacheGet(videoId) {
   if (!audioCache.has(videoId)) return null;
-  // Refresh recency: delete then re-insert so it's newest in iteration order
   const entry = audioCache.get(videoId);
   audioCache.delete(videoId);
-  audioCache.set(videoId, entry);
+  audioCache.set(videoId, entry); // refresh recency
   return entry;
 }
 
 function cacheSet(videoId, entry) {
-  // Evict oldest if full
   if (audioCache.size >= MAX_CACHE_SIZE) {
-    const oldestKey = audioCache.keys().next().value;
-    audioCache.delete(oldestKey);
-    console.log(`[Cache] Evicted oldest: ${oldestKey}. Cache size: ${audioCache.size}`);
+    const oldest = audioCache.keys().next().value;
+    audioCache.delete(oldest);
+    console.log(`[Cache] Evicted: ${oldest}`);
   }
   audioCache.set(videoId, entry);
-  console.log(`[Cache] Stored ${videoId}. Cache size: ${audioCache.size}/${MAX_CACHE_SIZE}`);
+  console.log(
+    `[Cache] Stored ${videoId} (${(entry.buffer.length / 1024 / 1024).toFixed(1)} MB). Size: ${audioCache.size}/${MAX_CACHE_SIZE}`
+  );
 }
 
-// ─── Download helper ────────────────────────────────────────────────────────
-function downloadToBuffer(videoId) {
+// ─── Fetch audio into a Buffer from a direct URL ───────────────────────────
+function fetchBuffer(url, contentType) {
   return new Promise((resolve, reject) => {
-    const url = `https://www.youtube.com/watch?v=${videoId}`;
+    const transport = url.startsWith("https") ? https : http;
     const chunks = [];
 
-    const stream = ytdl(url, {
-      filter: "audioonly",
-      quality: "highestaudio",
-      requestOptions: {
+    const req = transport.get(
+      url,
+      {
         headers: {
           "User-Agent":
-            "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+            "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36",
+          Referer: "https://www.youtube.com/",
         },
       },
+      (res) => {
+        // Follow redirect
+        if (
+          (res.statusCode === 301 || res.statusCode === 302) &&
+          res.headers.location
+        ) {
+          fetchBuffer(res.headers.location, contentType)
+            .then(resolve)
+            .catch(reject);
+          return;
+        }
+        if (res.statusCode !== 200) {
+          reject(new Error(`Upstream returned ${res.statusCode}`));
+          return;
+        }
+        const ct = res.headers["content-type"] || contentType;
+        res.on("data", (c) => chunks.push(c));
+        res.on("end", () =>
+          resolve({ buffer: Buffer.concat(chunks), contentType: ct.split(";")[0] })
+        );
+      }
+    );
+
+    req.on("error", reject);
+    req.setTimeout(30000, () => {
+      req.destroy();
+      reject(new Error("Download timed out"));
     });
-
-    let contentType = "audio/webm";
-
-    stream.on("info", (_info, format) => {
-      if (format.mimeType) contentType = format.mimeType.split(";")[0];
-    });
-
-    stream.on("data", (chunk) => chunks.push(chunk));
-    stream.on("end", () => resolve({ buffer: Buffer.concat(chunks), contentType }));
-    stream.on("error", reject);
   });
 }
 
 // ─── Controller ─────────────────────────────────────────────────────────────
 const streamAudio = async (req, res) => {
   const { videoId } = req.params;
-
-  if (!videoId) {
-    return res.status(400).json({ message: "videoId is required" });
-  }
+  if (!videoId) return res.status(400).json({ message: "videoId is required" });
 
   try {
-    // 1. Check cache
     let entry = cacheGet(videoId);
 
     if (entry) {
       console.log(`[Cache] HIT for ${videoId}`);
     } else {
-      // 2. Download
-      console.log(`[Download] Fetching audio for ${videoId}...`);
-      entry = await downloadToBuffer(videoId);
+      console.log(`[Stream] Fetching audio for ${videoId}...`);
+      const { url, contentType } = await getPipedAudioUrl(videoId);
+      entry = await fetchBuffer(url, contentType);
       cacheSet(videoId, entry);
-      console.log(`[Download] Done for ${videoId} — ${(entry.buffer.length / 1024 / 1024).toFixed(1)} MB`);
     }
 
     const { buffer, contentType } = entry;
-    const totalSize = buffer.length;
-
-    // 3. Support Range requests so the browser can seek
+    const total = buffer.length;
     const rangeHeader = req.headers.range;
 
     if (rangeHeader) {
-      const [startStr, endStr] = rangeHeader.replace(/bytes=/, "").split("-");
-      const start = parseInt(startStr, 10);
-      const end = endStr ? parseInt(endStr, 10) : Math.min(start + 1024 * 1024, totalSize - 1);
-
-      if (start >= totalSize) {
-        res.status(416).setHeader("Content-Range", `bytes */${totalSize}`).end();
-        return;
+      const [s, e] = rangeHeader.replace(/bytes=/, "").split("-");
+      const start = parseInt(s, 10);
+      const end = e
+        ? parseInt(e, 10)
+        : Math.min(start + 1024 * 1024, total - 1);
+      if (start >= total) {
+        return res
+          .status(416)
+          .setHeader("Content-Range", `bytes */${total}`)
+          .end();
       }
-
       res.writeHead(206, {
-        "Content-Range": `bytes ${start}-${end}/${totalSize}`,
+        "Content-Range": `bytes ${start}-${end}/${total}`,
         "Accept-Ranges": "bytes",
         "Content-Length": end - start + 1,
         "Content-Type": contentType,
@@ -101,7 +140,7 @@ const streamAudio = async (req, res) => {
       res.end(buffer.slice(start, end + 1));
     } else {
       res.writeHead(200, {
-        "Content-Length": totalSize,
+        "Content-Length": total,
         "Content-Type": contentType,
         "Accept-Ranges": "bytes",
         "Cache-Control": "no-cache",
@@ -110,11 +149,9 @@ const streamAudio = async (req, res) => {
     }
   } catch (err) {
     console.error(`[Stream] Error for ${videoId}:`, err.message);
-    if (!res.headersSent) {
+    if (!res.headersSent)
       res.status(500).json({ message: "Failed to get audio", error: err.message });
-    }
   }
 };
 
 module.exports = { streamAudio };
-
