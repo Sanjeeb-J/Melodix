@@ -1,5 +1,4 @@
 const jwt = require("jsonwebtoken");
-const User = require("../models/User");
 
 const protect = async (req, res, next) => {
   let token;
@@ -22,7 +21,9 @@ const protect = async (req, res, next) => {
 
   try {
     const decoded = jwt.verify(token, process.env.JWT_SECRET || "melodix_super_secret_2026");
-    req.user = await User.findById(decoded.id).select("-password");
+    // Attach decoded payload directly — no DB lookup needed.
+    // JWT verification (signature check) is sufficient for auth.
+    req.user = decoded;
     next();
   } catch (error) {
     return res.status(401).json({ message: "Not authorized, token failed" });
