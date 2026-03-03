@@ -3,7 +3,7 @@ services:
   melodix-backend:
     type: "api"
     runtime: "nodejs20"
-    build: "npm install"
-    command: "node index.js"
+    build: "cd backend && npm install"
+    command: "node backend/index.js"
     env:
       - NODE_ENV=production
