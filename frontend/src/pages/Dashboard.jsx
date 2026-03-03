@@ -85,7 +85,7 @@ function PlayerBar() {
       style={{ height: "var(--player-height)", background: "#181818" }}
     >
       {/* Left: song info (hidden on mobile) */}
-      <div className="hidden md:flex items-center gap-3 w-[30%] min-w-0 text-left">
+      <div className="flex min-w-10 md:flex items-center gap-3 w-[30%] min-w-0 text-left">
         {currentSong ? (
           <>
             <img
