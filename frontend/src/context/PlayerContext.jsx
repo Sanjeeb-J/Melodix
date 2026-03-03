@@ -160,18 +160,18 @@ export const PlayerProvider = ({ children }) => {
     const fetchAudio = async () => {
       try {
         const streamUrl = getStreamUrl(videoId);
+        // Backend returns JSON with audioUrl (Google CDN) + mimeType
         const response = await fetch(streamUrl);
         if (!response.ok) throw new Error(`HTTP ${response.status}`);
         if (cancelled) return;
 
-        const blob = await response.blob();
+        const { audioUrl, mimeType } = await response.json();
+        if (!audioUrl) throw new Error("No audioUrl in response");
         if (cancelled) return;
 
-        const blobUrl = URL.createObjectURL(blob);
-        blobUrlRef.current = blobUrl;
-
         if (audioRef.current) {
-          audioRef.current.src = blobUrl;
+          // Set src directly – browser handles streaming + seeking natively
+          audioRef.current.src = audioUrl;
           audioRef.current.volume = volume;
           audioRef.current.load();
           audioRef.current.play().catch(() => {});
