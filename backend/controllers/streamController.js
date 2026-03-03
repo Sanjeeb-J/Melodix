@@ -1,127 +1,103 @@
 const { spawn } = require("child_process");
-const ffmpeg = require("fluent-ffmpeg");
 const ffmpegStatic = require("ffmpeg-static");
-const https = require("https");
-const http = require("http");
 
-// Use system ffmpeg if available (Docker has it installed), else ffmpeg-static
-const ffmpegPath = process.env.FFMPEG_PATH || ffmpegStatic;
-ffmpeg.setFfmpegPath(ffmpegPath);
+// ─── Config ───────────────────────────────────────────────────────────────────
+// Docker/Linux: set YTDLP_PATH=/usr/local/bin/yt-dlp in the environment
+// Windows dev:  falls back to `python -m yt_dlp`
+const YTDLP_PATH = process.env.YTDLP_PATH || null;
 
-// ─── yt-dlp spawn helper ──────────────────────────────────────────────────────
-// On Docker/Linux: yt-dlp is at /usr/local/bin/yt-dlp  → set YTDLP_PATH env var
-// On Windows dev:  yt-dlp runs via  python -m yt_dlp   → automatic fallback
+// Use system ffmpeg on Docker (has libmp3lame), else ffmpeg-static
+const FFMPEG_BIN = process.env.FFMPEG_PATH || ffmpegStatic;
+
+// ─── Spawn yt-dlp ─────────────────────────────────────────────────────────────
 function spawnYtDlp(args) {
-  const ytdlpPath = process.env.YTDLP_PATH;
-
-  if (ytdlpPath) {
-    // Docker / Linux: direct binary
-    return spawn(ytdlpPath, args);
-  } else {
-    // Windows dev fallback: python -m yt_dlp
-    return spawn("python", ["-m", "yt_dlp", ...args]);
+  if (YTDLP_PATH) {
+    return spawn(YTDLP_PATH, args);
   }
+  // Windows: python -m yt_dlp
+  return spawn("python", ["-m", "yt_dlp", ...args]);
 }
 
-// ─── Get direct CDN audio URL from YouTube ───────────────────────────────────
-function getAudioUrl(videoId) {
-  return new Promise((resolve, reject) => {
-    const url = `https://www.youtube.com/watch?v=${videoId}`;
-    const args = [
-      "--get-url",
-      "-f", "bestaudio[ext=webm]/bestaudio[ext=m4a]/bestaudio/best",
-      "--no-playlist",
-      "--no-warnings",
-      "--quiet",
-      url,
-    ];
-
-    const proc = spawnYtDlp(args);
-    let stdout = "";
-    let stderr = "";
-
-    proc.stdout.on("data", (d) => (stdout += d.toString()));
-    proc.stderr.on("data", (d) => (stderr += d.toString()));
-
-    proc.on("close", (code) => {
-      const streamUrl = stdout.trim().split("\n")[0];
-      if (code === 0 && streamUrl) {
-        resolve(streamUrl);
-      } else {
-        reject(new Error(stderr.trim() || `yt-dlp exited with code ${code}`));
-      }
-    });
-
-    proc.on("error", (err) =>
-      reject(new Error(`Failed to spawn yt-dlp: ${err.message}`))
-    );
-  });
-}
-
-// ─── Stream Controller ────────────────────────────────────────────────────────
+// ─── Controller ───────────────────────────────────────────────────────────────
 const streamAudio = async (req, res) => {
   const { videoId } = req.params;
   if (!videoId) return res.status(400).json({ message: "videoId is required" });
 
-  try {
-    console.log(`[Stream] Resolving audio URL via yt-dlp for ${videoId}...`);
-    const audioUrl = await getAudioUrl(videoId);
-    console.log(`[Stream] Got CDN URL, piping through ffmpeg → MP3...`);
+  console.log(`[Stream] Starting yt-dlp + ffmpeg pipe for ${videoId}`);
 
-    res.writeHead(200, {
-      "Content-Type": "audio/mpeg",
-      "Cache-Control": "no-cache",
-      "Transfer-Encoding": "chunked",
-    });
+  // Step 1 – yt-dlp downloads audio to stdout, no temp file
+  const ytdlpArgs = [
+    "-f", "bestaudio[ext=webm]/bestaudio[ext=m4a]/bestaudio/best",
+    "--no-playlist",
+    "--no-warnings",
+    "-o", "-",    // output to stdout
+    `https://www.youtube.com/watch?v=${videoId}`,
+  ];
+  const ytdlp = spawnYtDlp(ytdlpArgs);
 
-    const protocol = audioUrl.startsWith("https") ? https : http;
+  // Step 2 – ffmpeg reads from stdin, encodes to MP3, writes to stdout
+  const ffmpegArgs = [
+    "-hide_banner", "-loglevel", "error",
+    "-i", "pipe:0",           // read from stdin (yt-dlp output)
+    "-vn",                    // no video
+    "-acodec", "libmp3lame",
+    "-ab", "128k",
+    "-f", "mp3",
+    "pipe:1",                 // write to stdout
+  ];
+  const ff = spawn(FFMPEG_BIN, ffmpegArgs);
 
-    const cdnReq = protocol.get(
-      audioUrl,
-      { headers: { "User-Agent": "Mozilla/5.0" } },
-      (audioStream) => {
-        if (audioStream.statusCode >= 400) {
-          console.error(`[Stream] CDN returned ${audioStream.statusCode} for ${videoId}`);
-          if (!res.headersSent) res.status(502).end();
-          return;
-        }
+  // Pipe yt-dlp → ffmpeg
+  ytdlp.stdout.pipe(ff.stdin);
 
-        const command = ffmpeg(audioStream)
-          .format("mp3")
-          .audioCodec("libmp3lame")
-          .audioBitrate(128)
-          .on("error", (err) => {
-            if (
-              !err.message.includes("Output stream closed") &&
-              !err.message.includes("SIGKILL")
-            ) {
-              console.error(`[FFmpeg] Transcode error for ${videoId}:`, err.message);
-            }
-          })
-          .on("end", () => console.log(`[Stream] Finished ${videoId}`));
+  // Send headers once we know we're going to stream
+  res.writeHead(200, {
+    "Content-Type": "audio/mpeg",
+    "Cache-Control": "no-cache",
+    "Transfer-Encoding": "chunked",
+  });
 
-        command.pipe(res, { end: true });
+  // Pipe ffmpeg output → HTTP response
+  ff.stdout.pipe(res);
 
-        req.on("close", () => {
-          console.log(`[Stream] Client disconnected for ${videoId}`);
-          try { command.kill("SIGKILL"); } catch (_) {}
-          audioStream.destroy();
-          cdnReq.destroy();
-        });
-      }
-    );
+  // ─── Error handling ─────────────────────────────────────────────────────────
+  ytdlp.stderr.on("data", (d) => {
+    const msg = d.toString().trim();
+    if (msg) console.error(`[yt-dlp] ${msg}`);
+  });
 
-    cdnReq.on("error", (err) => {
-      console.error(`[Stream] CDN fetch error for ${videoId}:`, err.message);
-      if (!res.headersSent) res.status(502).json({ message: "Failed to fetch audio" });
-    });
+  ff.stderr.on("data", (d) => {
+    const msg = d.toString().trim();
+    if (msg) console.error(`[ffmpeg] ${msg}`);
+  });
 
-  } catch (err) {
-    console.error(`[Stream] Error for ${videoId}:`, err.message);
-    if (!res.headersSent) {
-      res.status(500).json({ message: "Failed to stream audio", error: err.message });
-    }
-  }
+  ytdlp.on("error", (err) => {
+    console.error(`[Stream] yt-dlp spawn error: ${err.message}`);
+    if (!res.headersSent) res.status(500).json({ message: "yt-dlp error", error: err.message });
+  });
+
+  ff.on("error", (err) => {
+    console.error(`[Stream] ffmpeg spawn error: ${err.message}`);
+  });
+
+  ytdlp.on("close", (code) => {
+    if (code !== 0) console.error(`[Stream] yt-dlp exited with code ${code} for ${videoId}`);
+    // Close ffmpeg stdin so it knows input is done
+    ff.stdin.end();
+  });
+
+  ff.on("close", (code) => {
+    if (code !== 0) console.error(`[Stream] ffmpeg exited with code ${code} for ${videoId}`);
+    else console.log(`[Stream] Done streaming ${videoId}`);
+    if (!res.writableEnded) res.end();
+  });
+
+  // ─── Client disconnect cleanup ──────────────────────────────────────────────
+  req.on("close", () => {
+    console.log(`[Stream] Client disconnected for ${videoId}`);
+    try { ytdlp.kill("SIGKILL"); } catch (_) {}
+    try { ff.stdin.destroy(); ff.kill("SIGKILL"); } catch (_) {}
+  });
 };
 
 module.exports = { streamAudio };
