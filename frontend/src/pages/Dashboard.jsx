@@ -41,6 +41,7 @@ import {
   ListMusic,
   Loader2,
   Menu,
+  ExternalLink,
 } from "lucide-react";
 
 // ─── Helpers ───────────────────────────────────────────
@@ -603,6 +604,12 @@ function PlaylistView({ playlist, onBack, onUpdate, onDelete }) {
   const [deletingId, setDeletingId] = useState(null);
   const [isSearchOpen, setIsSearchOpen] = useState(false);
 
+  // Edit song state
+  const [editingSong, setEditingSong] = useState(null);
+  const [editSongName, setEditSongName] = useState("");
+  const [editSongArtist, setEditSongArtist] = useState("");
+  const [savingEdit, setSavingEdit] = useState(false);
+
   const handlePlay = (song, idx) => {
     if (currentSong?.youtubeId === song.youtubeId && isPlaying) {
       togglePlay();
@@ -638,6 +645,37 @@ function PlaylistView({ playlist, onBack, onUpdate, onDelete }) {
       showToast("Failed to remove", "error");
     } finally {
       setDeletingId(null);
+    }
+  };
+
+  const openEditSong = (song) => {
+    setEditingSong(song);
+    setEditSongName(song.name);
+    setEditSongArtist(song.artist || "");
+  };
+
+  const handleSaveEdit = async () => {
+    if (!editingSong || !editSongName.trim()) return;
+    setSavingEdit(true);
+    try {
+      await updateSong(playlist._id, editingSong._id, {
+        name: editSongName.trim(),
+        artist: editSongArtist.trim(),
+      });
+      onUpdate({
+        ...playlist,
+        songs: playlist.songs.map((s) =>
+          s._id === editingSong._id
+            ? { ...s, name: editSongName.trim(), artist: editSongArtist.trim() }
+            : s
+        ),
+      });
+      showToast("Song updated!", "success");
+      setEditingSong(null);
+    } catch {
+      showToast("Failed to update", "error");
+    } finally {
+      setSavingEdit(false);
     }
   };
 
@@ -722,7 +760,7 @@ function PlaylistView({ playlist, onBack, onUpdate, onDelete }) {
       {playlist.songs?.length > 0 ? (
         <div className="bg-[#121212] lg:bg-transparent">
           {/* Table header */}
-          <div className="grid grid-cols-[2rem_1fr_auto] md:grid-cols-[2rem_1fr_auto_5rem_3rem] gap-4 px-4 mb-2 text-xs text-sp-muted uppercase tracking-wider font-bold border-b border-[rgba(255,255,255,0.06)] pb-2">
+          <div className="grid grid-cols-[2rem_1fr_auto] md:grid-cols-[2rem_1fr_auto_5rem_6rem] gap-4 px-4 mb-2 text-xs text-sp-muted uppercase tracking-wider font-bold border-b border-[rgba(255,255,255,0.06)] pb-2">
             <span>#</span>
             <span>Title</span>
             <span className="hidden md:block">Artist</span>
@@ -734,7 +772,7 @@ function PlaylistView({ playlist, onBack, onUpdate, onDelete }) {
             <div
               key={song._id}
               onClick={() => handlePlay(song, idx)}
-              className={`grid grid-cols-[3rem_1fr_auto] md:grid-cols-[2rem_1fr_auto_5rem_3rem] gap-4 px-2 md:px-4 py-2.5 rounded-md transition-all cursor-pointer group hover:bg-sp-hover ${
+              className={`grid grid-cols-[3rem_1fr_auto] md:grid-cols-[2rem_1fr_auto_5rem_6rem] gap-4 px-2 md:px-4 py-2.5 rounded-md transition-all cursor-pointer group hover:bg-sp-hover ${
                 isCurrent(song) ? "bg-[rgba(29,185,84,0.06)]" : ""
               }`}
             >
@@ -771,14 +809,32 @@ function PlaylistView({ playlist, onBack, onUpdate, onDelete }) {
               {/* Duration */}
               <p className="hidden md:flex items-center text-sm text-sp-muted font-mono">{song.duration}</p>
 
-              {/* Delete */}
-              <div className="flex items-center justify-end">
+              {/* Actions: YouTube / Edit / Delete */}
+              <div className="flex items-center justify-end gap-1">
+                {/* YouTube link */}
+                <button
+                  onClick={(e) => { e.stopPropagation(); window.open(song.youtubeLink || `https://www.youtube.com/watch?v=${song.youtubeId}`, "_blank"); }}
+                  className="opacity-0 group-hover:opacity-100 text-sp-dim hover:text-red-500 transition-all p-1 rounded-md hover:bg-[rgba(255,255,255,0.06)]"
+                  title="Open on YouTube"
+                >
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><path d="M23.498 6.186a3.016 3.016 0 0 0-2.122-2.136C19.505 3.545 12 3.545 12 3.545s-7.505 0-9.377.505A3.017 3.017 0 0 0 .502 6.186C0 8.07 0 12 0 12s0 3.93.502 5.814a3.016 3.016 0 0 0 2.122 2.136c1.871.505 9.376.505 9.376.505s7.505 0 9.377-.505a3.015 3.015 0 0 0 2.122-2.136C24 15.93 24 12 24 12s0-3.93-.502-5.814zM9.545 15.568V8.432L15.818 12l-6.273 3.568z"/></svg>
+                </button>
+                {/* Edit song */}
+                <button
+                  onClick={(e) => { e.stopPropagation(); openEditSong(song); }}
+                  className="opacity-0 group-hover:opacity-100 text-sp-dim hover:text-white transition-all p-1 rounded-md hover:bg-[rgba(255,255,255,0.06)]"
+                  title="Edit song"
+                >
+                  <Edit2 size={14} />
+                </button>
+                {/* Delete song */}
                 <button
                   onClick={(e) => { e.stopPropagation(); handleDeleteSong(song._id); }}
                   disabled={deletingId === song._id}
-                  className="opacity-0 group-hover:opacity-100 text-sp-dim hover:text-red-400 transition-all"
+                  className="opacity-0 group-hover:opacity-100 text-sp-dim hover:text-red-400 transition-all p-1 rounded-md hover:bg-[rgba(255,255,255,0.06)]"
+                  title="Delete song"
                 >
-                  {deletingId === song._id ? <Loader2 size={16} className="animate-spin" /> : <Trash2 size={16} />}
+                  {deletingId === song._id ? <Loader2 size={14} className="animate-spin" /> : <Trash2 size={14} />}
                 </button>
               </div>
             </div>
@@ -805,6 +861,74 @@ function PlaylistView({ playlist, onBack, onUpdate, onDelete }) {
           onUpdate={onUpdate}
           onClose={() => setIsSearchOpen(false)}
         />
+      )}
+
+      {/* Edit song modal */}
+      {editingSong && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm">
+          <div
+            className="w-full max-w-sm rounded-xl overflow-hidden animate-in"
+            style={{ background: "#282828" }}
+          >
+            <div className="flex items-center justify-between px-6 py-4 border-b border-[rgba(255,255,255,0.06)]">
+              <h3 className="font-black text-lg">Update Song</h3>
+              <button
+                onClick={() => setEditingSong(null)}
+                className="text-sp-dim hover:text-white transition-colors"
+              >
+                <X size={20} />
+              </button>
+            </div>
+            <div className="p-6 space-y-4">
+              <div className="flex items-center gap-3 mb-2">
+                <img
+                  src={editingSong.thumbnail}
+                  alt=""
+                  className="w-12 h-12 rounded object-cover flex-shrink-0"
+                />
+                <div className="min-w-0 flex-1">
+                  <p className="text-xs text-sp-dim truncate">{editingSong.duration}</p>
+                </div>
+              </div>
+              <div>
+                <label className="block text-xs text-sp-dim font-bold mb-1.5 uppercase tracking-wider">Song Title</label>
+                <input
+                  autoFocus
+                  type="text"
+                  value={editSongName}
+                  onChange={(e) => setEditSongName(e.target.value)}
+                  onKeyDown={(e) => e.key === "Enter" && handleSaveEdit()}
+                  className="w-full bg-[#3a3a3a] text-white rounded-md px-4 py-3 text-sm font-semibold outline-none focus:ring-2 focus:ring-white/30"
+                />
+              </div>
+              <div>
+                <label className="block text-xs text-sp-dim font-bold mb-1.5 uppercase tracking-wider">Artist</label>
+                <input
+                  type="text"
+                  value={editSongArtist}
+                  onChange={(e) => setEditSongArtist(e.target.value)}
+                  onKeyDown={(e) => e.key === "Enter" && handleSaveEdit()}
+                  className="w-full bg-[#3a3a3a] text-white rounded-md px-4 py-3 text-sm font-semibold outline-none focus:ring-2 focus:ring-white/30"
+                />
+              </div>
+              <div className="flex gap-3 justify-end pt-2">
+                <button
+                  onClick={() => setEditingSong(null)}
+                  className="px-5 py-2.5 text-sm font-bold text-white hover:scale-105 transition-transform"
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={handleSaveEdit}
+                  disabled={savingEdit || !editSongName.trim()}
+                  className="px-6 py-2.5 bg-sp-green text-black font-bold rounded-full text-sm hover:bg-sp-green-h hover:scale-105 transition-all disabled:opacity-40"
+                >
+                  {savingEdit ? <Loader2 size={16} className="animate-spin" /> : "Save"}
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
       )}
     </div>
   );

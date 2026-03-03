@@ -120,6 +120,11 @@ export const PlayerProvider = ({ children }) => {
     };
     const onPlay = () => setIsPlaying(true);
     const onPause = () => setIsPlaying(false);
+    const onError = (e) => {
+      console.error("[Player] Audio error:", audio.error?.message || e);
+      setIsLoading(false);
+      setIsPlaying(false);
+    };
 
     audio.addEventListener("timeupdate", onTimeUpdate);
     audio.addEventListener("durationchange", onDurationChange);
@@ -127,6 +132,7 @@ export const PlayerProvider = ({ children }) => {
     audio.addEventListener("canplay", onCanPlay);
     audio.addEventListener("play", onPlay);
     audio.addEventListener("pause", onPause);
+    audio.addEventListener("error", onError);
 
     return () => {
       audio.removeEventListener("timeupdate", onTimeUpdate);
@@ -135,6 +141,7 @@ export const PlayerProvider = ({ children }) => {
       audio.removeEventListener("canplay", onCanPlay);
       audio.removeEventListener("play", onPlay);
       audio.removeEventListener("pause", onPause);
+      audio.removeEventListener("error", onError);
     };
   }, [repeatMode, nextSong, isPlaying]);
 
