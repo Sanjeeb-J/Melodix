@@ -50,10 +50,12 @@ const streamAudio = async (req, res) => {
     const yt = await getYT();
 
     // The download API provides an optimized WHATWG stream.
+    // Using ANDROID client bypasses the "Video is login required" / age-restriction block
     const webStream = await yt.download(videoId, {
       type: "audio",
       quality: "best",
       format: "mp4", // Requesting mp4 gives m4a (aac) from YouTube
+      client: "YTMUSIC",
     });
 
     if (!webStream) {
