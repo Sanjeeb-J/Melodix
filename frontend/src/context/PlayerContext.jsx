@@ -159,13 +159,12 @@ export const PlayerProvider = ({ children }) => {
       const streamUrl = getStreamUrl(videoId);
       
       if (audioRef.current) {
-        // Point audio element directly to our proxy endpoint
+        // Set src and load — DO NOT call play() here.
+        // The `canplay` event handler below will trigger play() once the
+        // audio is actually ready, avoiding the play/pause race condition.
         audioRef.current.src = streamUrl;
         audioRef.current.volume = volume;
         audioRef.current.load();
-        audioRef.current.play().catch((err) => {
-          console.warn("[Player] Auto-play prevented or error:", err.message);
-        });
       }
     } catch (err) {
       console.error("[Player] Failed to setup audio src:", err.message);
@@ -200,7 +199,14 @@ export const PlayerProvider = ({ children }) => {
     const onCanPlay = () => {
       setIsLoading(false);
       setLoadingMessage("");
-      if (isPlaying) audio.play().catch(() => {});
+      // Always attempt to play when ready — the user intended to play
+      // (isPlaying was set to true when playSong was called)
+      audio.play().catch((err) => {
+        // Suppress AbortError from rapid song switches; log other errors
+        if (!err.message.includes("interrupted") && !err.message.includes("AbortError")) {
+          console.warn("[Player] Play error:", err.message);
+        }
+      });
     };
     const onPlay = () => setIsPlaying(true);
     const onPause = () => setIsPlaying(false);
