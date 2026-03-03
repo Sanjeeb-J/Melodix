@@ -1,4 +1,4 @@
-import { useState, useContext } from "react";
+import { useState, useContext, useEffect } from "react";
 import { loginUser, registerUser } from "../services/authService";
 import { useNavigate } from "react-router-dom";
 import { Mail, Lock, Eye, EyeOff, User, Loader2, CheckCircle2, Music2 } from "lucide-react";
@@ -9,8 +9,14 @@ function Auth() {
   const [showPassword, setShowPassword] = useState(false);
   const [status, setStatus] = useState("idle");
   const [errorMsg, setErrorMsg] = useState("");
-  const navigate = useNavigate();
-  const { login } = useContext(AuthContext);
+   const navigate = useNavigate();
+  const { login, token } = useContext(AuthContext);
+
+  useEffect(() => {
+    if (token) {
+      navigate("/dashboard");
+    }
+  }, [token, navigate]);
 
   const [loginData, setLoginData] = useState({ email: "", password: "" });
   const [registerData, setRegisterData] = useState({ name: "", email: "", password: "" });

@@ -42,6 +42,7 @@ import {
   Loader2,
   Menu,
   ExternalLink,
+  LogOut,
 } from "lucide-react";
 
 // ─── Helpers ───────────────────────────────────────────
@@ -275,6 +276,13 @@ function Sidebar({
             <Search size={22} />
             Search
           </button>
+          <button
+            onClick={onLogout}
+            className="flex items-center gap-4 px-3 py-2 rounded-full text-sm font-bold text-sp-dim hover:text-white transition-all"
+          >
+            <LogOut size={22} />
+            Log out
+          </button>
         </div>
       </nav>
 
@@ -342,16 +350,8 @@ function Sidebar({
           )}
         </div>
 
-        <div className="px-4 py-3 border-t border-[rgba(255,255,255,0.06)]">
-          <button
-            onClick={onLogout}
-            className="text-xs text-sp-muted hover:text-white transition-colors font-semibold"
-          >
-            Log out
-          </button>
         </div>
-      </div>
-    </aside>
+      </aside>
     </>
   );
 }
@@ -1214,10 +1214,17 @@ export default function Dashboard() {
             >
               <Menu size={24} />
             </button>
-            <div className="ml-4 flex items-center gap-2 font-black text-white">
+            <div className="ml-4 flex-1 flex items-center gap-2 font-black text-white">
                <Music2 size={24} className="text-sp-green" />
                Melodix
             </div>
+            <button
+              onClick={handleLogout}
+              className="text-sp-dim hover:text-white transition-colors"
+              title="Log out"
+            >
+              <LogOut size={22} />
+            </button>
           </header>
 
           <div className="p-4 lg:p-6 pb-[120px]">
