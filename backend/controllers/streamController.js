@@ -2,10 +2,14 @@ const youtubedl = require("youtube-dl-exec");
 const fs = require("fs");
 const https = require("https");
 const http = require("http");
+const ffmpegPath = require("ffmpeg-static");
 
-// Use system yt-dlp if it exists (for Docker), otherwise let the package handle it
+// Use system yt-dlp if it exists (e.g. Docker), otherwise fallback
 const binaryPath = fs.existsSync("/usr/local/bin/yt-dlp") ? "/usr/local/bin/yt-dlp" : undefined;
 const ydl = binaryPath ? youtubedl.create(binaryPath) : youtubedl;
+
+// Log the ffmpeg path for debugging
+console.log(`[System] ffmpeg path: ${ffmpegPath}`);
 
 // ─── 10-song LRU Cache ──────────────────────────────────────────────────────
 const MAX_CACHE_SIZE = 10;

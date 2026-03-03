@@ -2,7 +2,8 @@ version: "1"
 services:
   melodix-backend:
     type: "api"
-    runtime: "docker"
+    runtime: "nodejs20"
+    build: "npm install"
     command: "node index.js"
     env:
       - PORT=8080
