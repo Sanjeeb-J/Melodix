@@ -20,6 +20,6 @@
     "mongodb": "^7.1.0",
     "mongoose": "^9.0.2",
     "mongosh": "^2.5.10",
-    "youtubei.js": "^13.4.0"
+    "play-dl": "^1.9.7"
   }
 }

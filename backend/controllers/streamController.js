@@ -1,18 +1,6 @@
-const { Innertube } = require("youtubei.js");
+const playdl = require("play-dl");
 const https = require("https");
 const http = require("http");
-
-let innertube = null;
-
-const getInnertube = async () => {
-  if (!innertube) {
-    innertube = await Innertube.create({
-      cache: undefined,
-      generate_session_locally: true,
-    });
-  }
-  return innertube;
-};
 
 const streamAudio = async (req, res) => {
   const { videoId } = req.params;
@@ -21,96 +9,57 @@ const streamAudio = async (req, res) => {
     return res.status(400).json({ message: "videoId is required" });
   }
 
-  console.log(`[Stream] Request for videoId: ${videoId}`);
+  console.log(`[Stream] play-dl request for videoId: ${videoId}`);
 
   try {
-    const yt = await getInnertube();
-    const info = await yt.getBasicInfo(videoId);
+    // play-dl handles authentication/deciphering much better
+    const stream = await playdl.stream(`https://www.youtube.com/watch?v=${videoId}`, {
+        quality: 1, // best audio
+        discordPlayerCompatibility: true // provides a clear stream
+    });
 
-    // Choose the best audio-only format
-    const audioFormats = info.streaming_data?.adaptive_formats?.filter(
-      (f) => f.has_audio && !f.has_video
-    );
-
-    if (!audioFormats || audioFormats.length === 0) {
-      console.error(`[Stream] No audio formats for ${videoId}`);
-      return res.status(500).json({ message: "No audio formats available" });
+    if (!stream || !stream.url) {
+        throw new Error("Could not extract stream URL");
     }
 
-    // Sort by bitrate descending, pick the best one
-    audioFormats.sort((a, b) => (b.bitrate || 0) - (a.bitrate || 0));
-    const bestAudio = audioFormats[0];
-
-    const audioUrl = bestAudio.decipher(yt.session.player);
-
-    if (!audioUrl) {
-      console.error(`[Stream] Could not decipher URL for ${videoId}`);
-      return res.status(500).json({ message: "Could not get audio URL" });
-    }
-
-    console.log(
-      `[Stream] Got audio URL for ${videoId} (${bestAudio.mime_type}, ${bestAudio.bitrate}bps). Proxying...`
-    );
+    console.log(`[Stream] Got source URL for ${videoId}. Proxying...`);
 
     // Set streaming headers
-    const contentType = bestAudio.mime_type || "audio/webm";
-    res.setHeader("Content-Type", contentType);
+    res.setHeader("Content-Type", "audio/mpeg");
     res.setHeader("Accept-Ranges", "bytes");
     res.setHeader("Cache-Control", "no-cache");
 
-    // Determine http or https
-    const transport = audioUrl.startsWith("https") ? https : http;
+    const transport = stream.url.startsWith("https") ? https : http;
 
-    // Proxy the audio stream to the client
-    const ytReq = transport.get(
-      audioUrl,
-      {
-        headers: {
-          "User-Agent":
-            "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
-          Referer: "https://www.youtube.com/",
-        },
-      },
-      (ytRes) => {
-        if (ytRes.headers["content-type"]) {
-          res.setHeader("Content-Type", ytRes.headers["content-type"]);
-        }
-        if (ytRes.headers["content-length"]) {
-          res.setHeader("Content-Length", ytRes.headers["content-length"]);
-        }
-
-        console.log(`[Stream] Proxying ${videoId} - HTTP ${ytRes.statusCode}`);
-        ytRes.pipe(res);
-
-        ytRes.on("end", () => {
-          console.log(`[Stream] Done: ${videoId}`);
-        });
+    const ytReq = transport.get(stream.url, {
+      headers: {
+        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+        "Referer": "https://www.youtube.com/",
+        "Range": req.headers.range || "bytes=0-"
       }
-    );
+    }, (ytRes) => {
+      // Forward relevant headers
+      if (ytRes.headers["content-type"]) res.setHeader("Content-Type", ytRes.headers["content-type"]);
+      if (ytRes.headers["content-length"]) res.setHeader("Content-Length", ytRes.headers["content-length"]);
+      if (ytRes.headers["content-range"]) res.setHeader("Content-Range", ytRes.headers["content-range"]);
+      
+      res.status(ytRes.statusCode || 200);
+      ytRes.pipe(res);
+    });
 
     ytReq.on("error", (err) => {
-      console.error(`[Stream] Proxy error for ${videoId}:`, err.message);
-      if (!res.headersSent) {
-        res.status(500).json({ message: "Proxy stream error" });
-      }
+      console.error(`[Stream] Proxy error:`, err.message);
+      if (!res.headersSent) res.status(500).send("Stream error");
     });
 
     req.on("close", () => {
-      console.log(`[Stream] Client closed for ${videoId}`);
       ytReq.destroy();
     });
+
   } catch (err) {
-    console.error(
-      `[Stream] Error for ${videoId}:`,
-      err.message || err
-    );
-    // Reset innertube instance on error so next request creates fresh one
-    innertube = null;
+    console.error(`[Stream] play-dl Error:`, err.message);
     if (!res.headersSent) {
-      res.status(500).json({
-        message: "Stream failed",
-        error: (err.message || String(err)).substring(0, 200),
-      });
+      res.status(500).json({ message: "Stream failed", error: err.message });
     }
   }
 };

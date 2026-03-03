@@ -11,7 +11,11 @@ export const PlayerProvider = ({ children }) => {
   const [isPlaying, setIsPlaying] = useState(false);
   const [isShuffle, setIsShuffle] = useState(false);
   const [repeatMode, setRepeatMode] = useState("none"); // "none" | "all" | "one"
-  const [volume, setVolumeState] = useState(1);
+  const [volume, setVolumeState] = useState(() => {
+    const saved = localStorage.getItem("melodix_volume");
+    return saved !== null ? parseFloat(saved) : 0.7;
+  });
+  const [isMuted, setIsMuted] = useState(false);
   const [progress, setProgress] = useState(0); // 0–1
   const [duration, setDuration] = useState(0);
   const [currentTime, setCurrentTime] = useState(0);
@@ -75,12 +79,58 @@ export const PlayerProvider = ({ children }) => {
 
   const setVolume = useCallback((val) => {
     setVolumeState(val);
+    localStorage.setItem("melodix_volume", val);
     if (audioRef.current) audioRef.current.volume = val;
+    if (val > 0) setIsMuted(false);
   }, []);
+
+  const toggleMute = useCallback(() => {
+    if (!audioRef.current) return;
+    const newMuted = !isMuted;
+    setIsMuted(newMuted);
+    audioRef.current.muted = newMuted;
+  }, [isMuted]);
 
   const toggleShuffle = () => setIsShuffle((s) => !s);
   const toggleRepeat = () =>
     setRepeatMode((m) => (m === "none" ? "all" : m === "all" ? "one" : "none"));
+
+  // Keyboard Shortcuts
+  useEffect(() => {
+    const handleKeyDown = (e) => {
+      // Don't trigger if user is typing in an input/textarea
+      if (["INPUT", "TEXTAREA", "SELECT"].includes(document.activeElement.tagName)) return;
+
+      switch (e.code) {
+        case "Space":
+          e.preventDefault();
+          togglePlay();
+          break;
+        case "ArrowRight":
+          if (e.shiftKey) { nextSong(); } 
+          else if (audioRef.current) { audioRef.current.currentTime += 10; }
+          break;
+        case "ArrowLeft":
+          if (e.shiftKey) { prevSong(); } 
+          else if (audioRef.current) { audioRef.current.currentTime -= 10; }
+          break;
+        case "KeyL":
+          toggleRepeat();
+          break;
+        case "KeyS":
+          toggleShuffle();
+          break;
+        case "KeyM":
+          toggleMute();
+          break;
+        default:
+          break;
+      }
+    };
+
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, [togglePlay, nextSong, prevSong, toggleRepeat, toggleShuffle, toggleMute]);
 
   // When currentSong changes, load it
   useEffect(() => {
@@ -153,6 +203,7 @@ export const PlayerProvider = ({ children }) => {
         isShuffle,
         repeatMode,
         volume,
+        isMuted,
         progress,
         duration,
         currentTime,
@@ -164,6 +215,7 @@ export const PlayerProvider = ({ children }) => {
         prevSong,
         seek,
         setVolume,
+        toggleMute,
         toggleShuffle,
         toggleRepeat,
       }}

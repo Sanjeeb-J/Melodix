@@ -60,6 +60,7 @@ function PlayerBar() {
     isShuffle,
     repeatMode,
     volume,
+    isMuted,
     progress,
     duration,
     currentTime,
@@ -69,21 +70,13 @@ function PlayerBar() {
     prevSong,
     seek,
     setVolume,
+    toggleMute,
     toggleShuffle,
     toggleRepeat,
   } = usePlayer();
 
-  const progressRef = useRef(null);
-
-  const handleProgressClick = (e) => {
-    if (!progressRef.current) return;
-    const rect = progressRef.current.getBoundingClientRect();
-    const frac = (e.clientX - rect.left) / rect.width;
-    seek(Math.max(0, Math.min(1, frac)));
-  };
-
   const RepeatIcon = repeatMode === "one" ? Repeat1 : Repeat;
-  const VolumeIcon = volume === 0 ? VolumeX : volume < 0.5 ? Volume1 : Volume2;
+  const VolumeIcon = isMuted || volume === 0 ? VolumeX : volume < 0.5 ? Volume1 : Volume2;
 
   return (
     <footer
@@ -91,7 +84,7 @@ function PlayerBar() {
       style={{ height: "var(--player-height)", background: "#181818" }}
     >
       {/* Left: song info (hidden on mobile) */}
-      <div className="hidden md:flex items-center gap-3 w-[30%] min-w-0">
+      <div className="hidden md:flex items-center gap-3 w-[30%] min-w-0 text-left">
         {currentSong ? (
           <>
             <img
@@ -100,12 +93,14 @@ function PlayerBar() {
               className="w-14 h-14 rounded object-cover flex-shrink-0"
             />
             <div className="min-w-0">
-              <p className="text-sm font-semibold text-white truncate">
+              <p className="text-sm font-semibold text-white truncate hover:underline cursor-pointer">
                 {currentSong.name || currentSong.title}
               </p>
-              <p className="text-xs text-sp-dim truncate">{currentSong.artist}</p>
+              <p className="text-xs text-sp-dim truncate hover:text-white hover:underline cursor-pointer">
+                {currentSong.artist}
+              </p>
             </div>
-            <button className="text-sp-dim hover:text-sp-green transition-colors flex-shrink-0">
+            <button className="text-sp-dim hover:text-sp-green transition-colors flex-shrink-0 ml-2">
               <Heart size={16} />
             </button>
           </>
@@ -114,28 +109,21 @@ function PlayerBar() {
         )}
       </div>
 
-      {/* Mobile song info (only title) */}
-      <div className="flex md:hidden flex-col min-w-0 flex-1 mr-4">
-        {currentSong && (
-          <p className="text-sm font-semibold text-white truncate">
-            {currentSong.name || currentSong.title}
-          </p>
-        )}
-      </div>
-
       {/* Center: controls */}
-      <div className="flex flex-col items-center gap-2 w-[40%]">
-        <div className="flex items-center gap-4">
+      <div className="flex flex-col items-center gap-2 w-full md:w-[40%]">
+        <div className="flex items-center gap-3 md:gap-5">
           <button
             onClick={toggleShuffle}
             className={`transition-colors ${isShuffle ? "text-sp-green" : "text-sp-dim hover:text-white"}`}
+            title="Toggle Shuffle (S)"
           >
-            <Shuffle size={18} />
+            <Shuffle size={16} />
           </button>
 
           <button
             onClick={prevSong}
             className="text-sp-dim hover:text-white transition-colors"
+            title="Previous (Shift+Left)"
           >
             <SkipBack size={20} fill="currentColor" />
           </button>
@@ -143,7 +131,8 @@ function PlayerBar() {
           <button
             onClick={togglePlay}
             disabled={!currentSong}
-            className="w-9 h-9 bg-white rounded-full flex items-center justify-center hover:scale-105 transition-transform disabled:opacity-40"
+            className="w-8 h-8 md:w-10 md:h-10 bg-white rounded-full flex items-center justify-center hover:scale-105 transition-transform disabled:opacity-40"
+            title="Play/Pause (Space)"
           >
             {isLoading ? (
               <Loader2 size={18} className="animate-spin text-black" />
@@ -157,6 +146,7 @@ function PlayerBar() {
           <button
             onClick={nextSong}
             className="text-sp-dim hover:text-white transition-colors"
+            title="Next (Shift+Right)"
           >
             <SkipForward size={20} fill="currentColor" />
           </button>
@@ -164,27 +154,32 @@ function PlayerBar() {
           <button
             onClick={toggleRepeat}
             className={`transition-colors ${repeatMode !== "none" ? "text-sp-green" : "text-sp-dim hover:text-white"}`}
+            title="Toggle Repeat (L)"
           >
-            <RepeatIcon size={18} />
+            <RepeatIcon size={16} />
           </button>
         </div>
 
         {/* Progress bar */}
-        <div className="flex items-center gap-2 w-full max-w-md">
-          <span className="hidden md:block text-xs text-sp-muted w-8 text-right tabular-nums">
+        <div className="flex items-center gap-2 w-full max-w-lg group">
+          <span className="text-[10px] text-sp-muted w-10 text-right tabular-nums">
             {fmtTime(currentTime)}
           </span>
-          <div
-            ref={progressRef}
-            onClick={handleProgressClick}
-            className="flex-1 h-1 rounded-full bg-[rgba(255,255,255,0.2)] relative cursor-pointer group progress-bar"
-          >
-            <div
-              className="h-full rounded-full bg-white group-hover:bg-sp-green transition-colors"
-              style={{ width: `${(progress || 0) * 100}%` }}
+          <div className="relative flex-1 h-3 flex items-center">
+             <input
+              type="range"
+              min={0}
+              max={1}
+              step={0.001}
+              value={progress || 0}
+              onChange={(e) => seek(parseFloat(e.target.value))}
+              className="w-full h-1 rounded-full appearance-none bg-[rgba(255,255,255,0.1)] cursor-pointer outline-none"
+              style={{
+                background: `linear-gradient(to right, #1db954 ${progress * 100}%, rgba(255,255,255,0.1) ${progress * 100}%)`,
+              }}
             />
           </div>
-          <span className="hidden md:block text-xs text-sp-muted w-8 tabular-nums">
+          <span className="text-[10px] text-sp-muted w-10 tabular-nums">
             {fmtTime(duration)}
           </span>
         </div>
@@ -193,21 +188,22 @@ function PlayerBar() {
       {/* Right: volume (hidden on mobile) */}
       <div className="hidden md:flex items-center gap-2 w-[30%] justify-end">
         <button
-          onClick={() => setVolume(volume === 0 ? 0.7 : 0)}
+          onClick={toggleMute}
           className="text-sp-dim hover:text-white transition-colors"
+          title="Mute (M)"
         >
-          <VolumeIcon size={16} />
+          <VolumeIcon size={18} />
         </button>
         <input
           type="range"
           min={0}
           max={1}
           step={0.01}
-          value={volume}
+          value={isMuted ? 0 : volume}
           onChange={(e) => setVolume(parseFloat(e.target.value))}
-          className="w-24"
+          className="w-24 h-1"
           style={{
-            background: `linear-gradient(to right, white ${volume * 100}%, rgba(255,255,255,0.2) ${volume * 100}%)`,
+            background: `linear-gradient(to right, #1db954 ${(isMuted ? 0 : volume) * 100}%, rgba(255,255,255,0.1) ${(isMuted ? 0 : volume) * 100}%)`,
           }}
         />
       </div>
