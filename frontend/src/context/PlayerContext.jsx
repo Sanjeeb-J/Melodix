@@ -155,42 +155,26 @@ export const PlayerProvider = ({ children }) => {
     }
     audioRef.current.src = "";
 
-    let cancelled = false;
-
-    const fetchAudio = async () => {
-      try {
-        const streamUrl = getStreamUrl(videoId);
-        // Backend returns JSON with audioUrl (Google CDN) + mimeType
-        const response = await fetch(streamUrl);
-        if (!response.ok) throw new Error(`HTTP ${response.status}`);
-        if (cancelled) return;
-
-        const { audioUrl, mimeType } = await response.json();
-        if (!audioUrl) throw new Error("No audioUrl in response");
-        if (cancelled) return;
-
-        if (audioRef.current) {
-          // Set src directly – browser handles streaming + seeking natively
-          audioRef.current.src = audioUrl;
-          audioRef.current.volume = volume;
-          audioRef.current.load();
-          audioRef.current.play().catch(() => {});
-        }
-      } catch (err) {
-        if (!cancelled) {
-          console.error("[Player] Failed to fetch audio:", err.message);
-          setIsLoading(false);
-          setIsPlaying(false);
-        }
+    try {
+      const streamUrl = getStreamUrl(videoId);
+      
+      if (audioRef.current) {
+        // Point audio element directly to our proxy endpoint
+        audioRef.current.src = streamUrl;
+        audioRef.current.volume = volume;
+        audioRef.current.load();
+        audioRef.current.play().catch((err) => {
+          console.warn("[Player] Auto-play prevented or error:", err.message);
+        });
       }
-    };
+    } catch (err) {
+      console.error("[Player] Failed to setup audio src:", err.message);
+      setIsLoading(false);
+      setIsPlaying(false);
+    }
 
-    fetchAudio();
-
-    return () => {
-      cancelled = true;
-    };
   }, [currentSong?.videoId, currentSong?.youtubeId]);
+
 
 
   // Audio event listeners
