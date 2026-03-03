@@ -1,4 +1,3 @@
-const { Innertube } = require("youtubei.js");
 const https = require("https");
 const http = require("http");
 
@@ -29,22 +28,23 @@ function cacheSet(videoId, entry) {
 // ─── Fetch audio into a Buffer from a direct URL ───────────────────────────
 function fetchBuffer(url) {
   return new Promise((resolve, reject) => {
-    const transport = url.startsWith("https") ? https : http;
     const chunks = [];
-
     const makeRequest = (targetUrl) => {
+      const transport = targetUrl.startsWith("https") ? https : http;
       transport.get(
         targetUrl,
         {
           headers: {
             "User-Agent":
-              "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36",
+              "com.google.android.youtube/17.31.35 (Linux; U; Android 11) gzip",
             Referer: "https://www.youtube.com/",
-            "Range": "bytes=0-",
           },
         },
         (res) => {
-          if ([301, 302, 303, 307, 308].includes(res.statusCode) && res.headers.location) {
+          if (
+            [301, 302, 303, 307, 308].includes(res.statusCode) &&
+            res.headers.location
+          ) {
             makeRequest(res.headers.location);
             return;
           }
@@ -55,34 +55,25 @@ function fetchBuffer(url) {
           const contentType = res.headers["content-type"] || "audio/mp4";
           res.on("data", (c) => chunks.push(c));
           res.on("end", () =>
-            resolve({
-              buffer: Buffer.concat(chunks),
-              contentType: contentType.split(";")[0],
-            })
+            resolve({ buffer: Buffer.concat(chunks), contentType: contentType.split(";")[0] })
           );
           res.on("error", reject);
         }
-      );
+      ).on("error", reject);
     };
-
-    const req = transport.get(url, {}, () => {});
-    req.setTimeout(90000, () => {
-      req.destroy();
-      reject(new Error("Download timed out"));
-    });
-    req.on("error", reject);
-    req.destroy();
-
     makeRequest(url);
   });
 }
 
-// Single shared Innertube instance
+// ─── Innertube singleton (lazy loaded as ESM) ───────────────────────────────
 let innertubeInstance = null;
+
 async function getInnertube() {
   if (!innertubeInstance) {
+    // Dynamic import because youtubei.js is ESM-only
+    const { Innertube } = await import("youtubei.js");
     innertubeInstance = await Innertube.create({
-      cache: null,
+      retrieve_player: true,
       generate_session_locally: true,
     });
   }
@@ -100,26 +91,30 @@ const streamAudio = async (req, res) => {
     if (entry) {
       console.log(`[Cache] HIT for ${videoId}`);
     } else {
-      console.log(`[Stream] Extracting audio URL for ${videoId}...`);
-
+      console.log(`[Stream] Fetching info for ${videoId}...`);
       const yt = await getInnertube();
-      const info = await yt.getBasicInfo(videoId);
 
-      // Get the best audio-only format
+      // getInfo with ANDROID client gives direct (non-throttled) URLs
+      const info = await yt.getInfo(videoId, "ANDROID");
+
+      // Pick best audio-only format
       const format = info.chooseFormat({
         quality: "best",
         type: "audio",
         format: "any",
       });
 
-      if (!format || !format.url) {
-        throw new Error("No suitable audio format found");
-      }
+      if (!format) throw new Error("No audio format found");
 
-      console.log(
-        `[Stream] Downloading audio for ${videoId} (${format.audio_quality || "unknown quality"})...`
-      );
-      entry = await fetchBuffer(format.url);
+      // Try direct URL first, otherwise decipher
+      let audioUrl = format.url;
+      if (!audioUrl && yt.session.player) {
+        audioUrl = format.decipher(yt.session.player);
+      }
+      if (!audioUrl) throw new Error("Could not resolve audio URL");
+
+      console.log(`[Stream] Downloading audio for ${videoId} (${format.audio_quality})...`);
+      entry = await fetchBuffer(audioUrl);
       cacheSet(videoId, entry);
     }
 
@@ -130,14 +125,9 @@ const streamAudio = async (req, res) => {
     if (rangeHeader) {
       const [s, e] = rangeHeader.replace(/bytes=/, "").split("-");
       const start = parseInt(s, 10);
-      const end = e
-        ? parseInt(e, 10)
-        : Math.min(start + 1024 * 1024, total - 1);
+      const end = e ? parseInt(e, 10) : Math.min(start + 1024 * 1024, total - 1);
       if (start >= total) {
-        return res
-          .status(416)
-          .setHeader("Content-Range", `bytes */${total}`)
-          .end();
+        return res.status(416).setHeader("Content-Range", `bytes */${total}`).end();
       }
       res.writeHead(206, {
         "Content-Range": `bytes ${start}-${end}/${total}`,
@@ -157,10 +147,9 @@ const streamAudio = async (req, res) => {
     }
   } catch (err) {
     console.error(`[Stream] Error for ${videoId}:`, err.message);
-    if (!res.headersSent)
-      res
-        .status(500)
-        .json({ message: "Failed to get audio", error: err.message });
+    if (!res.headersSent) {
+      res.status(500).json({ message: "Failed to get audio", error: err.message });
+    }
   }
 };
 
