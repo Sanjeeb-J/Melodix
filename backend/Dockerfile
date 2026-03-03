@@ -26,6 +26,7 @@ COPY --from=builder /app ./
 
 ENV PORT=8080
 ENV NODE_ENV=production
+ENV YTDLP_PATH=/usr/local/bin/yt-dlp
 
 EXPOSE 8080
 
