@@ -1,25 +1,16 @@
-const youtubedl = require("youtube-dl-exec");
-const fs = require("fs");
+const { Innertube } = require("youtubei.js");
 const https = require("https");
 const http = require("http");
-const ffmpegPath = require("ffmpeg-static");
-
-// Use system yt-dlp if it exists (e.g. Docker), otherwise fallback
-const binaryPath = fs.existsSync("/usr/local/bin/yt-dlp") ? "/usr/local/bin/yt-dlp" : undefined;
-const ydl = binaryPath ? youtubedl.create(binaryPath) : youtubedl;
-
-// Log the ffmpeg path for debugging
-console.log(`[System] ffmpeg path: ${ffmpegPath}`);
 
 // ─── 10-song LRU Cache ──────────────────────────────────────────────────────
 const MAX_CACHE_SIZE = 10;
-const audioCache = new Map(); // key: videoId, value: { buffer, contentType }
+const audioCache = new Map();
 
 function cacheGet(videoId) {
   if (!audioCache.has(videoId)) return null;
   const entry = audioCache.get(videoId);
   audioCache.delete(videoId);
-  audioCache.set(videoId, entry); // refresh recency
+  audioCache.set(videoId, entry);
   return entry;
 }
 
@@ -36,49 +27,66 @@ function cacheSet(videoId, entry) {
 }
 
 // ─── Fetch audio into a Buffer from a direct URL ───────────────────────────
-function fetchBuffer(url, contentType) {
+function fetchBuffer(url) {
   return new Promise((resolve, reject) => {
     const transport = url.startsWith("https") ? https : http;
     const chunks = [];
 
-    const req = transport.get(
-      url,
-      {
-        headers: {
-          "User-Agent":
-            "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36",
-          Referer: "https://www.youtube.com/",
+    const makeRequest = (targetUrl) => {
+      transport.get(
+        targetUrl,
+        {
+          headers: {
+            "User-Agent":
+              "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36",
+            Referer: "https://www.youtube.com/",
+            "Range": "bytes=0-",
+          },
         },
-      },
-      (res) => {
-        // Follow redirect
-        if (
-          (res.statusCode === 301 || res.statusCode === 302) &&
-          res.headers.location
-        ) {
-          fetchBuffer(res.headers.location, contentType)
-            .then(resolve)
-            .catch(reject);
-          return;
+        (res) => {
+          if ([301, 302, 303, 307, 308].includes(res.statusCode) && res.headers.location) {
+            makeRequest(res.headers.location);
+            return;
+          }
+          if (res.statusCode !== 200 && res.statusCode !== 206) {
+            reject(new Error(`Upstream returned ${res.statusCode}`));
+            return;
+          }
+          const contentType = res.headers["content-type"] || "audio/mp4";
+          res.on("data", (c) => chunks.push(c));
+          res.on("end", () =>
+            resolve({
+              buffer: Buffer.concat(chunks),
+              contentType: contentType.split(";")[0],
+            })
+          );
+          res.on("error", reject);
         }
-        if (res.statusCode !== 200 && res.statusCode !== 206) {
-          reject(new Error(`Upstream returned ${res.statusCode}`));
-          return;
-        }
-        const ct = res.headers["content-type"] || contentType;
-        res.on("data", (c) => chunks.push(c));
-        res.on("end", () =>
-          resolve({ buffer: Buffer.concat(chunks), contentType: ct.split(";")[0] })
-        );
-      }
-    );
+      );
+    };
 
-    req.on("error", reject);
-    req.setTimeout(60000, () => {
+    const req = transport.get(url, {}, () => {});
+    req.setTimeout(90000, () => {
       req.destroy();
       reject(new Error("Download timed out"));
     });
+    req.on("error", reject);
+    req.destroy();
+
+    makeRequest(url);
   });
+}
+
+// Single shared Innertube instance
+let innertubeInstance = null;
+async function getInnertube() {
+  if (!innertubeInstance) {
+    innertubeInstance = await Innertube.create({
+      cache: null,
+      generate_session_locally: true,
+    });
+  }
+  return innertubeInstance;
 }
 
 // ─── Controller ─────────────────────────────────────────────────────────────
@@ -92,31 +100,26 @@ const streamAudio = async (req, res) => {
     if (entry) {
       console.log(`[Cache] HIT for ${videoId}`);
     } else {
-      console.log(`[Stream] Extracting URL for ${videoId}...`);
-      
-      const output = await ydl(`https://www.youtube.com/watch?v=${videoId}`, {
-        dumpSingleJson: true,
-        noCheckCertificates: true,
-        noWarnings: true,
-        preferFreeFormats: true,
-        addHeader: [
-          'referer:https://www.youtube.com/',
-          'user-agent:Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'
-        ]
+      console.log(`[Stream] Extracting audio URL for ${videoId}...`);
+
+      const yt = await getInnertube();
+      const info = await yt.getBasicInfo(videoId);
+
+      // Get the best audio-only format
+      const format = info.chooseFormat({
+        quality: "best",
+        type: "audio",
+        format: "any",
       });
 
-
-      // Find best audio-only format
-      const audioFormat = output.formats
-        .filter(f => f.vcodec === 'none' && f.acodec !== 'none')
-        .sort((a, b) => (b.abr || 0) - (a.abr || 0))[0];
-
-      if (!audioFormat || !audioFormat.url) {
+      if (!format || !format.url) {
         throw new Error("No suitable audio format found");
       }
 
-      console.log(`[Stream] Downloading audio for ${videoId}...`);
-      entry = await fetchBuffer(audioFormat.url, audioFormat.ext === 'm4a' ? 'audio/mp4' : 'audio/webm');
+      console.log(
+        `[Stream] Downloading audio for ${videoId} (${format.audio_quality || "unknown quality"})...`
+      );
+      entry = await fetchBuffer(format.url);
       cacheSet(videoId, entry);
     }
 
@@ -155,7 +158,9 @@ const streamAudio = async (req, res) => {
   } catch (err) {
     console.error(`[Stream] Error for ${videoId}:`, err.message);
     if (!res.headersSent)
-      res.status(500).json({ message: "Failed to get audio", error: err.message });
+      res
+        .status(500)
+        .json({ message: "Failed to get audio", error: err.message });
   }
 };
 
