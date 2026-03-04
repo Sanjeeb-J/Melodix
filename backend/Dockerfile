@@ -1,6 +1,9 @@
 # Build stage
 FROM node:20-slim AS builder
 
+# Install Python (required by yt-dlp-exec install script)
+RUN apt-get update && apt-get install -y python3 && rm -rf /var/lib/apt/lists/*
+
 WORKDIR /app
 COPY package*.json ./
 RUN npm install
