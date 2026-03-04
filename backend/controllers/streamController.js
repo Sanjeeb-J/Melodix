@@ -1,10 +1,11 @@
 const { spawn } = require("child_process");
 const ffmpegStatic = require("ffmpeg-static");
 
+// Use system ffmpeg on Railway/Docker, else fallback to ffmpeg-static for local
+const FFMPEG_BIN = process.env.FFMPEG_PATH || (process.env.RAILWAY_STATIC_URL ? "ffmpeg" : ffmpegStatic);
+// Use system yt-dlp
+const YTDLP_BIN = "yt-dlp";
 
-
-// Use system ffmpeg on Docker (has libmp3lame), else ffmpeg-static
-const FFMPEG_BIN = process.env.FFMPEG_PATH || ffmpegStatic;
 
 // ─── Controller ───────────────────────────────────────────────────────────────
 const streamAudio = async (req, res) => {
@@ -23,13 +24,18 @@ const streamAudio = async (req, res) => {
 
     const url = `https://www.youtube.com/watch?v=${videoId}`;
     
-    // Step 1 - get stream via yt-dlp
-    const { exec } = require('yt-dlp-exec');
-    const ytdlProcess = exec(url, {
-      o: '-',           // write to stdout
-      q: '',            // quiet
-      f: 'bestaudio',   // best audio format
-    });
+    // Step 1 - get stream via yt-dlp directly
+    const ytdlArgs = [
+      url,
+      "-o", "-",           // write to stdout
+      "-q",                // quiet
+      "-f", "bestaudio[ext=m4a]/bestaudio",   // preferred formats
+      "--no-playlist",
+      "--no-warnings"
+    ];
+
+    const ytdlProcess = spawn(YTDLP_BIN, ytdlArgs);
+
 
     // Step 2 – ffmpeg reads from stdin, encodes to MP3, writes to stdout
     const ffmpegArgs = [
