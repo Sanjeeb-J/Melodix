@@ -10,18 +10,24 @@ const streamAudio = async (req, res) => {
   const { videoId } = req.params;
   if (!videoId) return res.status(400).json({ message: "videoId is required" });
 
-  console.log(`[Stream] Starting play-dl + ffmpeg pipe for ${videoId}`);
+  console.log(`[Stream] Starting yt-dlp + ffmpeg pipe for ${videoId}`);
 
   try {
-    // Obtain stream using play-dl (handles bypassing 403 / anti-bot naturally)
-    const streamInfo = await play.stream(videoId, { discordPlayerCompatibility : false });
-    console.log(`[Stream] Successfully retrieved audio stream for ${videoId} using play-dl.`);
-
     // Send headers as we're now ready to stream
     res.writeHead(200, {
       "Content-Type": "audio/mpeg",
       "Cache-Control": "no-cache",
       "Transfer-Encoding": "chunked",
+    });
+
+    const url = `https://www.youtube.com/watch?v=${videoId}`;
+    
+    // Step 1 - get stream via yt-dlp
+    const { exec } = require('yt-dlp-exec');
+    const ytdlProcess = exec(url, {
+      o: '-',           // write to stdout
+      q: '',            // quiet
+      f: 'bestaudio',   // best audio format
     });
 
     // Step 2 – ffmpeg reads from stdin, encodes to MP3, writes to stdout
@@ -37,8 +43,8 @@ const streamAudio = async (req, res) => {
     
     const ff = spawn(FFMPEG_BIN, ffmpegArgs);
 
-    // Pipe play-dl stream → ffmpeg
-    streamInfo.stream.pipe(ff.stdin);
+    // Pipe yt-dlp stream → ffmpeg
+    ytdlProcess.stdout.pipe(ff.stdin);
 
     // Pipe ffmpeg output → HTTP response
     ff.stdout.pipe(res);
@@ -60,8 +66,8 @@ const streamAudio = async (req, res) => {
       if (!res.writableEnded) res.end();
     });
     
-    streamInfo.stream.on("error", (err) => {
-        console.error(`[Stream] play-dl stream closed with error: ${err.message}`);
+    ytdlProcess.on("error", (err) => {
+        console.error(`[Stream] yt-dlp process closed with error: ${err.message}`);
         ff.stdin.end();
     });
 
@@ -69,7 +75,7 @@ const streamAudio = async (req, res) => {
     req.on("close", () => {
       console.log(`[Stream] Client closed connection for ${videoId}. Cleaning up processes.`);
       try {
-        if(streamInfo.stream) streamInfo.stream.destroy();
+        if(ytdlProcess) ytdlProcess.kill("SIGKILL");
         ff.kill("SIGKILL");
       } catch (e) {
         // Ignore errors during kill
@@ -77,7 +83,7 @@ const streamAudio = async (req, res) => {
     });
 
   } catch (err) {
-    console.error(`[Stream] Error getting video stream with play-dl: ${err.message}`);
+    console.error(`[Stream] Error setting up stream with yt-dlp: ${err.message}`);
     if (!res.headersSent) {
       return res.status(500).json({ message: "Failed to fetch audio stream", error: err.message });
     } else {
