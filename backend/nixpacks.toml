@@ -1,5 +1,8 @@
+[providers.node]
+node_version = "20"
+
 [phases.setup]
-nixPkgs = ["python3", "ffmpeg"]
+nixPkgs = ["python3", "ffmpeg", "curl"]
 
 [phases.install]
 cmds = ["npm install"]
