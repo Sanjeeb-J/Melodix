@@ -1,6 +1,7 @@
 const { spawn } = require("child_process");
 const ffmpegStatic = require("ffmpeg-static");
-const play = require("play-dl");
+
+
 
 // Use system ffmpeg on Docker (has libmp3lame), else ffmpeg-static
 const FFMPEG_BIN = process.env.FFMPEG_PATH || ffmpegStatic;
