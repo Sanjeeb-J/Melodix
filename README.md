@@ -2,94 +2,87 @@
 
 **Live Demo:** [Melodix.app](https://melodix-frontend-beta.vercel.app/)
 
-**Melodix** is a modern, full-stack music streaming platform that allows users to discover, play, and manage their favorite tracks. Built with a focus on performance and user experience, it brings a sleek interface to high-quality audio streaming.
+**Melodix** is a premium, full-stack music streaming platform that allows users to discover, play, and manage their favorite tracks. It features a sophisticated audio streaming pipeline that extracts high-quality audio directly from multiple sources, providing a seamless and responsive listening experience.
 
 ## ✨ Features
 
-* **Seamless Music Streaming:** High-quality audio playback with a custom-built player.
-* **Dynamic Search:** Find your favorite songs, artists, or albums instantly.
-* **User Playlists:** Create and manage personalized playlists (if supported by your backend).
-* **Responsive UI:** A beautiful, dark-themed interface inspired by top-tier streaming services, fully responsive across all devices.
-* **Real-time Updates:** Dynamic content loading and state management for a smooth experience.
+- **Advanced Audio Streaming:** High-quality MP3 streaming using a custom `yt-dlp` + `ffmpeg` pipeline.
+- **Dynamic Real-time Search:** Instantly find tracks, artists, and albums.
+- **Global Music Discovery:** Access a vast library of music with real-time audio extraction.
+- **Premium Dark UI:** A sleek, glassmorphic interface built for music enthusiasts, fully responsive across all devices.
+- **User Authentication:** Secure JWT-based auth with MongoDB for persistence.
+- **Custom Playlists:** Create and curate your own music collections.
 
 ## 🛠️ Tech Stack
 
 ### Frontend
-
-* **React.js**: Library for building the user interface.
-* **Tailwind CSS**: For modern, utility-first styling.
-* **Lucide React / FontAwesome**: For high-quality iconography.
-* **Vercel**: For lightning-fast frontend hosting.
+- **React 18 / Vite**: Modern, lightning-fast development and production builds.
+- **Tailwind CSS**: Professional styling with custom themes and glassmorphism.
+- **Lucide React**: Clean and consistent iconography.
+- **Vercel**: Optimized frontend hosting.
 
 ### Backend
-
-* **Node.js & Express**: Handling API requests and server-side logic.
-* **MongoDB**: For storing user data, track information, and playlists.
-* **JWT (JSON Web Tokens)**: For secure user authentication.
+- **Node.js / Express 5**: Cutting-edge backend framework for high-performance APIs.
+- **MongoDB / Mongoose**: Robust data persistence for users and playlists.
+- **FFmpeg & yt-dlp**: Real-time audio extraction and transcoding.
+- **Leapcell**: Cloud-native deployment for the streaming engine and API.
 
 ## 🚀 Getting Started
 
-Follow these steps to run the project locally:
+### Prerequisites
+- Node.js (v18+)
+- MongoDB
+- `ffmpeg` and `yt-dlp` installed on your system (for local streaming)
 
 ### 1. Clone the repository
-
 ```bash
 git clone https://github.com/Sanjeeb-J/Melodix.git
 cd Melodix
-
 ```
 
-### 2. Set up the Backend
-
+### 2. Backend Setup
 ```bash
 cd backend
 npm install
-# Create a .env file and add your MONGO_URI and PORT
+# Configure .env with your MONGO_URI, JWT_SECRET, and PORT
 npm start
-
 ```
 
-### 3. Set up the Frontend
-
+### 3. Frontend Setup
 ```bash
 cd ../frontend
 npm install
-npm start
-
+# Configure .env with VITE_API_URL
+npm run dev
 ```
 
-The application will be running at `http://localhost:3000`.
+The application will be running at `http://localhost:5173` (Frontend) and your configured backend port.
 
 ## 📁 Project Structure
 
 ```text
 Melodix/
-├── backend/          # Express server, Models, Routes, and Controllers
-├── frontend/         # React application
-│   ├── public/       # Static assets
+├── backend/          # Express 5 server, FFmpeg/yt-dlp pipeline, Models, Routes
+├── frontend/         # React 18 + Vite application
 │   ├── src/
-│   │   ├── components/ # Player, Sidebar, Navbar, etc.
-│   │   ├── pages/      # Home, Search, Library
-│   │   └── assets/     # Images and global styles
-├── LICENSE           # MIT License
-└── package.json      # Project-wide scripts
-
+│   │   ├── components/ # Core UI components (Player, Sidebar, etc.)
+│   │   ├── pages/      # View layouts (Home, Search, Dashboard)
+│   │   ├── services/   # API and Streaming logic
+│   │   └── context/    # Global state management
+├── README.md         # Current documentation
+└── LICENSE           # MIT License
 ```
 
 ## 🤝 Contributing
 
-Contributions are welcome! If you'd like to improve Melodix:
-
-1. Fork the project.
-2. Create your feature branch (`git checkout -b feature/AmazingFeature`).
-3. Commit your changes (`git commit -m 'Add some AmazingFeature'`).
-4. Push to the branch (`git push origin feature/AmazingFeature`).
-5. Open a Pull Request.
+Contributions are welcome! Please feel free to open a Pull Request.
 
 ## 📄 License
 
-This project is licensed under the **MIT License**. See the `LICENSE` file for details.
+This project is licensed under the **MIT License**.
 
 ## 👨‍💻 Developer
 
-**Sanjeeb J** *Full-Stack Web Developer* [GitHub Profile](https://www.google.com/search?q=https://github.com/Sanjeeb-J)
+**Sanjeeb J**  
+*Full-Stack Web Developer*  
+[GitHub Profile](https://github.com/Sanjeeb-J)
