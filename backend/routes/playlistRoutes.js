@@ -7,6 +7,7 @@ const {
   deleteSongFromPlaylist,
   updateSongInPlaylist,
   addSongFromYouTube,
+  markPlaylistPlayed,
 } = require("../controllers/playlistController");
 const { protect } = require("../middleware/authMiddleware");
 
@@ -16,6 +17,7 @@ router.post("/", protect, createPlaylist);
 router.get("/", protect, getUserPlaylists);
 router.delete("/:id", protect, deletePlaylist);
 router.put("/:id", protect, updatePlaylistName);
+router.put("/:id/play", protect, markPlaylistPlayed);
 router.delete("/:playlistId/songs/:songId", protect, deleteSongFromPlaylist);
 router.put("/:playlistId/songs/:songId", protect, updateSongInPlaylist);
 router.post("/:playlistId/songs", protect, addSongFromYouTube);

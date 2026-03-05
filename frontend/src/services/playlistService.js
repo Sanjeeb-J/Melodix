@@ -110,3 +110,14 @@ export const deletePlaylist = async (id) => {
     headers: { Authorization: `Bearer ${token}` },
   });
 };
+
+export const markPlaylistPlayed = async (id) => {
+  const token = localStorage.getItem("token");
+
+  const res = await fetch(`${API_URL}/${id}/play`, {
+    method: "PUT",
+    headers: { Authorization: `Bearer ${token}` },
+  });
+
+  return res.json();
+};

@@ -13,6 +13,7 @@ import {
   updateSong,
   updatePlaylist,
   deletePlaylist,
+  markPlaylistPlayed,
 } from "../services/playlistService";
 import { searchYouTube } from "../services/youtubeService";
 import { getPlaylistCover } from "../utils/playlistCover";
@@ -361,62 +362,86 @@ function Sidebar({
 }
 
 // ─── HomeView ──────────────────────────────────────────
-function HomeView({ playlists, onPlaylistClick, onCreatePlaylist }) {
+function HomeView({ playlists, onPlaylistClick, onCreatePlaylist, onMarkPlayed }) {
+  const [showAll, setShowAll] = useState(false);
   const { playSong } = usePlayer();
   const hour = new Date().getHours();
-  const greeting =
-    hour < 12 ? "Good morning" : hour < 17 ? "Good afternoon" : "Good evening";
+  
+  let greeting = "Good evening";
+  if (hour >= 5 && hour < 12) greeting = "Good morning";
+  else if (hour >= 12 && hour < 17) greeting = "Good afternoon";
+  else if (hour >= 17 && hour < 21) greeting = "Good evening";
+  else greeting = "Good night";
 
   const handlePlayAll = (playlist) => {
     if (!playlist.songs?.length) return;
     playSong(playlist.songs[0], playlist.songs, 0);
+    onMarkPlayed(playlist._id);
     onPlaylistClick(playlist);
   };
 
   return (
     <div className="animate-in">
-      <h2 className="text-2xl font-black mb-6">{greeting}</h2>
+      {!showAll && (
+        <>
+          <h2 className="text-2xl font-black mb-6">{greeting}</h2>
 
-      {/* Quick access grid */}
-      {playlists.length > 0 && (
-        <div className="grid grid-cols-2 sm:grid-cols-2 lg:grid-cols-3 gap-3 mb-8">
-          {playlists.slice(0, 6).map((p) => (
-            <div
-              key={p._id}
-              onClick={() => onPlaylistClick(p)}
-              role="button"
-              tabIndex={0}
-              onKeyDown={(e) => e.key === "Enter" && onPlaylistClick(p)}
-              className="flex items-center gap-3 bg-[rgba(255,255,255,0.07)] hover:bg-[rgba(255,255,255,0.12)] rounded-md overflow-hidden text-left transition-all group relative cursor-pointer"
-            >
-              <div className="w-14 h-14 flex-shrink-0">
-                {p.songs?.length > 0 ? (
-                  <img src={p.songs[0].thumbnail} alt="" className="w-full h-full object-cover" />
-                ) : (
-                  <div className={`w-full h-full bg-gradient-to-br ${getPlaylistCover(p._id)}`} />
-                )}
-              </div>
-              <span className="font-bold text-sm pr-3 truncate">{p.name}</span>
-              <button
-                onClick={(e) => { e.stopPropagation(); handlePlayAll(p); }}
-                className="absolute right-3 opacity-0 group-hover:opacity-100 transition-all w-10 h-10 bg-sp-green rounded-full flex items-center justify-center shadow-xl hover:scale-105"
-              >
-                <Play size={18} fill="black" className="text-black ml-0.5" />
-              </button>
+          {/* Quick access grid */}
+          {playlists.length > 0 && (
+            <div className="grid grid-cols-2 sm:grid-cols-2 lg:grid-cols-3 gap-3 mb-8">
+              {playlists.slice(0, 6).map((p) => (
+                <div
+                  key={p._id}
+                  onClick={() => { onMarkPlayed(p._id); onPlaylistClick(p); }}
+                  role="button"
+                  tabIndex={0}
+                  onKeyDown={(e) => e.key === "Enter" && (onMarkPlayed(p._id), onPlaylistClick(p))}
+                  className="flex items-center gap-3 bg-[rgba(255,255,255,0.07)] hover:bg-[rgba(255,255,255,0.12)] rounded-md overflow-hidden text-left transition-all group relative cursor-pointer"
+                >
+                  <div className="w-14 h-14 flex-shrink-0">
+                    {p.songs?.length > 0 ? (
+                      <img src={p.songs[0].thumbnail} alt="" className="w-full h-full object-cover" />
+                    ) : (
+                      <div className={`w-full h-full bg-gradient-to-br ${getPlaylistCover(p._id)}`} />
+                    )}
+                  </div>
+                  <span className="font-bold text-sm pr-3 truncate">{p.name}</span>
+                  <button
+                    onClick={(e) => { e.stopPropagation(); handlePlayAll(p); }}
+                    className="absolute right-3 opacity-0 group-hover:opacity-100 transition-all w-10 h-10 bg-sp-green rounded-full flex items-center justify-center shadow-xl hover:scale-105"
+                  >
+                    <Play size={18} fill="black" className="text-black ml-0.5" />
+                  </button>
+                </div>
+              ))}
             </div>
-          ))}
-        </div>
+          )}
+        </>
       )}
 
-      {/* All playlists */}
+      {/* All playlists section */}
       <div className="flex items-center justify-between mb-4">
-        <h3 className="text-xl font-black">Your playlists</h3>
-        <button
-          onClick={onCreatePlaylist}
-          className="text-sm text-sp-dim hover:text-white font-semibold transition-colors"
-        >
-          Show all
-        </button>
+        <h3 className="text-xl font-black">
+          {showAll ? (
+            <div className="flex items-center gap-2">
+              <button 
+                onClick={() => setShowAll(false)}
+                className="hover:text-sp-green transition-colors"
+              >
+                <ChevronLeft size={28} />
+              </button>
+              Your playlists
+            </div>
+          ) : "Your playlists"}
+        </h3>
+        {!showAll && (
+          <button
+            onClick={() => setShowAll(true)}
+            className="text-sm text-sp-dim hover:text-white font-semibold transition-colors"
+          >
+            Show all
+          </button>
+        )}
       </div>
 
       {playlists.length === 0 ? (
@@ -434,7 +459,11 @@ function HomeView({ playlists, onPlaylistClick, onCreatePlaylist }) {
       ) : (
         <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-4">
           {playlists.map((p) => (
-            <PlaylistCard key={p._id} playlist={p} onClick={() => onPlaylistClick(p)} />
+            <PlaylistCard 
+              key={p._id} 
+              playlist={p} 
+              onClick={() => { onMarkPlayed(p._id); onPlaylistClick(p); }} 
+            />
           ))}
         </div>
       )}
@@ -1176,6 +1205,15 @@ export default function Dashboard() {
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
   const handleLogout = () => { logout(); navigate("/"); };
 
+  const handleMarkPlayed = async (id) => {
+    try {
+      await markPlaylistPlayed(id);
+      fetchPlaylists(); // Refresh to show latest on top
+    } catch (err) {
+      console.error("Play update failed", err);
+    }
+  };
+
   if (loading) {
     return (
       <div className="h-screen bg-sp-black flex items-center justify-center">
@@ -1240,6 +1278,7 @@ export default function Dashboard() {
                 playlists={playlists}
                 onPlaylistClick={handlePlaylistClick}
                 onCreatePlaylist={() => setShowCreate(true)}
+                onMarkPlayed={handleMarkPlayed}
               />
             )}
 
