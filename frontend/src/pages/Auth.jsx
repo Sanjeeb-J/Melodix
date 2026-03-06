@@ -105,7 +105,7 @@ function Auth() {
             </div>
             
             <h2 className="text-3xl md:text-4xl font-bold mb-4 leading-tight italic text-center md:text-left">
-              "Where words fail, <span className="text-sp-green">music speaks.</span>"
+              "Where words fail, <br /><span className="text-sp-green">music speaks.</span>"
             </h2>
             <p className="text-sp-dim text-lg mb-8 max-w-sm text-center md:text-left mx-auto md:mx-0">
               Experience music like never before. High fidelity, zero limits. Join our community of music lovers today.
