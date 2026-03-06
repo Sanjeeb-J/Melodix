@@ -53,10 +53,25 @@ html, body, #root {
 .auth-bg {
   position: fixed;
   inset: 0;
-  background-image: url('./assets/images/auth-bg.png');
+  background-image: url('./assets/images/auth-bg-new.png');
   background-size: cover;
   background-position: center;
   z-index: -1;
+}
+
+.glass-morphism {
+  background: rgba(18, 18, 18, 0.75);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.8);
+}
+
+.auth-gradient-text {
+  background: linear-gradient(135deg, #ffffff 0%, #1db954 100%);
+  -webkit-background-clip: text;
+  background-clip: text;
+  -webkit-text-fill-color: transparent;
 }
 
 .auth-bg::after {
