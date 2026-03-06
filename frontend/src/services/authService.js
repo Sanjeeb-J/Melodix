@@ -30,13 +30,13 @@ export const loginUser = async (userData) => {
   return data;
 };
 
-export const forgotPassword = async (email) => {
+export const forgotPassword = async (email, newPassword) => {
   const res = await fetch(`${API_URL}/forgot-password`, {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
     },
-    body: JSON.stringify({ email }),
+    body: JSON.stringify({ email, newPassword }),
   });
 
   const data = await res.json();

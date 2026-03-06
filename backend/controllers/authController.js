@@ -60,11 +60,18 @@ const loginUser = async (req, res) => {
 
 const forgotPassword = async (req, res) => {
   try {
-    const { email } = req.body;
+    const { email, newPassword } = req.body;
     const user = await User.findOne({ email });
     
-    // For security, always return success even if user not found (simulated)
-    res.json({ message: "If an account exists, a reset link has been sent." });
+    if (!user) {
+      return res.status(404).json({ message: "User not found" });
+    }
+
+    const salt = await bcrypt.genSalt(10);
+    user.password = await bcrypt.hash(newPassword, salt);
+    await user.save();
+
+    res.json({ message: "Password reset successfully" });
   } catch (error) {
     res.status(500).json({ message: error.message });
   }

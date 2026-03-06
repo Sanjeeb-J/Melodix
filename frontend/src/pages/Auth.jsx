@@ -4,6 +4,7 @@ import { useNavigate } from "react-router-dom";
 import { Mail, Lock, Eye, EyeOff, User, Loader2, CheckCircle2, ArrowLeft } from "lucide-react";
 import { AuthContext } from "../context/AuthContext";
 import logo from "../assets/logo.png";
+import authBg from "../assets/images/auth-bg-new.png";
 
 function Auth() {
   const [view, setView] = useState("login"); // login, register, forgot
@@ -22,7 +23,7 @@ function Auth() {
 
   const [loginData, setLoginData] = useState({ email: "", password: "" });
   const [registerData, setRegisterData] = useState({ name: "", email: "", password: "" });
-  const [forgotEmail, setForgotEmail] = useState("");
+  const [forgotData, setForgotData] = useState({ email: "", password: "" });
 
   const handleLogin = async (e) => {
     e.preventDefault();
@@ -62,15 +63,16 @@ function Auth() {
     setStatus("loading");
     setErrorMsg("");
     try {
-      await forgotPassword(forgotEmail);
+      await forgotPassword(forgotData.email, forgotData.password);
       setStatus("success");
-      setSuccessMsg("If an account exists, a reset link has been sent.");
+      setSuccessMsg("Password reset successfully! You can now log in.");
       setTimeout(() => {
+        setView("login");
         setStatus("idle");
-      }, 3000);
+      }, 1500);
     } catch (err) {
       setStatus("idle");
-      setErrorMsg(err.message || "Failed to send reset link");
+      setErrorMsg(err.message || "Failed to reset password");
     }
   };
 
@@ -79,9 +81,9 @@ function Auth() {
   const isForgot = view === "forgot";
 
   return (
-    <div className="relative min-h-screen flex flex-col md:flex-row overflow-hidden bg-black text-white">
+    <div className="relative min-h-screen flex flex-col md:flex-row overflow-hidden text-white">
       {/* Background Decor */}
-      <div className="auth-bg" />
+      <div className="auth-bg" style={{ backgroundImage: `url(${authBg})` }} />
       
       {/* Left Side: Branding & Quote */}
       <div className="w-full md:w-1/2 flex flex-col justify-center p-8 md:p-16 z-10">
@@ -127,12 +129,12 @@ function Auth() {
             <h3 className="text-2xl font-bold mb-2">
               {isLogin && "Welcome Back"}
               {isRegister && "Create Account"}
-              {isForgot && "Reset Password"}
+              {isForgot && "Quick Reset"}
             </h3>
             <p className="text-sp-dim text-sm">
               {isLogin && "Enter your credentials to access Melodix"}
               {isRegister && "Join us and start your musical journey"}
-              {isForgot && "Enter your email to receive a reset link"}
+              {isForgot && "Enter your email and a new password to reset instantly"}
             </p>
           </div>
 
@@ -164,9 +166,9 @@ function Auth() {
                 <input
                   type="email"
                   placeholder="name@example.com"
-                  value={isForgot ? forgotEmail : (isLogin ? loginData.email : registerData.email)}
+                  value={isForgot ? forgotData.email : (isLogin ? loginData.email : registerData.email)}
                   onChange={(e) => {
-                    if (isForgot) setForgotEmail(e.target.value);
+                    if (isForgot) setForgotData({ ...forgotData, email: e.target.value });
                     else if (isLogin) setLoginData({ ...loginData, email: e.target.value });
                     else setRegisterData({ ...registerData, email: e.target.value });
                   }}
@@ -175,6 +177,31 @@ function Auth() {
                 />
               </div>
             </div>
+
+            {isForgot && (
+              <div className="space-y-1.5">
+                <label className="text-xs font-semibold text-sp-dim ml-1 uppercase tracking-wider">New Password</label>
+                <div className="relative group">
+                  <Lock size={18} className="absolute left-4 top-1/2 -translate-y-1/2 text-sp-muted group-focus-within:text-sp-green transition-colors" />
+                  <input
+                    type={showPassword ? "text" : "password"}
+                    placeholder="••••••••"
+                    value={forgotData.password}
+                    onChange={(e) => setForgotData({ ...forgotData, password: e.target.value })}
+                    required
+                    minLength={6}
+                    className="w-full bg-white/5 border border-white/10 rounded-2xl py-3.5 pl-12 pr-12 text-sm text-white placeholder:text-zinc-600 outline-none focus:border-sp-green/50 focus:bg-white/10 transition-all"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setShowPassword((s) => !s)}
+                    className="absolute right-4 top-1/2 -translate-y-1/2 text-sp-muted hover:text-white transition-colors"
+                  >
+                    {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
+                  </button>
+                </div>
+              </div>
+            )}
 
             {!isForgot && (
               <div className="space-y-1.5">
@@ -224,7 +251,7 @@ function Auth() {
             >
               {status === "loading" && <Loader2 size={18} className="animate-spin" />}
               {status === "success" && <CheckCircle2 size={18} />}
-              {status === "idle" && (isLogin ? "Sign In" : isRegister ? "Create Account" : "Send Reset Link")}
+              {status === "idle" && (isLogin ? "Sign In" : isRegister ? "Create Account" : "Reset Password")}
             </button>
 
             {errorMsg && (
