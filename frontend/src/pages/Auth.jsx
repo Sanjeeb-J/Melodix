@@ -81,9 +81,12 @@ function Auth() {
   const isForgot = view === "forgot";
 
   return (
-    <div className="relative min-h-screen flex flex-col md:flex-row overflow-hidden text-white">
-      {/* Background Decor */}
-      <div className="auth-bg" style={{ backgroundImage: `url(${authBg})` }} />
+    <div 
+      className="relative min-h-screen flex flex-col md:flex-row overflow-hidden text-white bg-cover bg-center"
+      style={{ backgroundImage: `url(${authBg})` }}
+    >
+      {/* Dark Overlay for readability */}
+      <div className="absolute inset-0 bg-black/40 z-0" />
       
       {/* Left Side: Branding & Quote */}
       <div className="w-full md:w-1/2 flex flex-col justify-center p-8 md:p-16 z-10">

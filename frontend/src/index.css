@@ -49,15 +49,7 @@ html, body, #root {
 
 .animate-in { animation: fade-in 0.25s ease forwards; }
 
-/* Auth page background */
-.auth-bg {
-  position: fixed;
-  inset: 0;
-  background-image: url('./assets/images/auth-bg-new.png');
-  background-size: cover;
-  background-position: center;
-  z-index: -1;
-}
+/* Redundant auth-bg styles removed */
 
 .glass-morphism {
   background: rgba(18, 18, 18, 0.75);
@@ -74,12 +66,7 @@ html, body, #root {
   -webkit-text-fill-color: transparent;
 }
 
-.auth-bg::after {
-  content: "";
-  position: absolute;
-  inset: 0;
-  background: rgba(0,0,0,0.6);
-}
+/* Redundant overlay removed */
 
 /* Range input global style */
 input[type="range"] {
