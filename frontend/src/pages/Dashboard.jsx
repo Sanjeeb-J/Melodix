@@ -84,7 +84,7 @@ function PlayerBar() {
 
   return (
     <footer
-      className="fixed bottom-0 left-0 right-0 z-50 flex items-center justify-between px-4 border-t border-[rgba(255,255,255,0.06)]"
+      className="relative w-full z-40 flex items-center justify-between px-4 border-t border-[rgba(255,255,255,0.06)] flex-shrink-0"
       style={{ height: "var(--player-height)", background: "#181818" }}
     >
       {/* Left: song info (hidden on mobile) */}
@@ -1272,7 +1272,7 @@ export default function Dashboard() {
             </button>
           </header>
 
-          <div className="p-4 lg:p-6 pb-[120px]">
+          <div className="p-4 lg:p-6 pb-10">
             {view === "home" && (
               <HomeView
                 playlists={playlists}
