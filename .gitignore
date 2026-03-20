@@ -1,3 +1,10 @@
 node_modules
 backend/.env
 frontend/.env
+
+# wrangler files
+.wrangler
+.dev.vars*
+!.dev.vars.example
+.env*
+!.env.example

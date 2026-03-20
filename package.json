@@ -3,11 +3,16 @@
   "version": "1.0.0",
   "scripts": {
     "start": "node backend/index.js",
-    "build": "cd backend && npm install"
+    "build": "cd backend && npm install",
+    "deploy": "wrangler deploy",
+    "preview": "wrangler dev"
   },
   "dependencies": {
     "mongodb": "^7.1.0",
     "node-fetch": "^2.7.0",
     "react-router-dom": "^7.11.0"
+  },
+  "devDependencies": {
+    "wrangler": "^4.76.0"
   }
 }
