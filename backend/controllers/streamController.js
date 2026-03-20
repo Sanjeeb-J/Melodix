@@ -1,43 +1,27 @@
 const { spawn } = require("child_process");
 const ffmpegStatic = require("ffmpeg-static");
+const ytdl = require("@distube/ytdl-core");
 
 // Use system ffmpeg on Railway/Docker, else fallback to ffmpeg-static for local
 const FFMPEG_BIN = process.env.FFMPEG_PATH || (process.env.RAILWAY_STATIC_URL ? "ffmpeg" : ffmpegStatic);
-// Use system yt-dlp
-const YTDLP_BIN = "yt-dlp";
-
 
 // ─── Controller ───────────────────────────────────────────────────────────────
 const streamAudio = async (req, res) => {
   const { videoId } = req.params;
   if (!videoId) return res.status(400).json({ message: "videoId is required" });
 
-  console.log(`[Stream] Starting yt-dlp + ffmpeg pipe for ${videoId}`);
+  const url = `https://www.youtube.com/watch?v=${videoId}`;
+  console.log(`[Stream] Starting ytdl-core + ffmpeg pipe for ${videoId}`);
 
   try {
-    // Send headers as we're now ready to stream
-    res.writeHead(200, {
-      "Content-Type": "audio/mpeg",
-      "Cache-Control": "no-cache",
-      "Transfer-Encoding": "chunked",
+    // 1. Create ytdl stream
+    const ytdlStream = ytdl(url, {
+      filter: "audioonly",
+      quality: "highestaudio",
+      highWaterMark: 1 << 25, // 32MB buffer
     });
 
-    const url = `https://www.youtube.com/watch?v=${videoId}`;
-    
-    // Step 1 - get stream via yt-dlp directly
-    const ytdlArgs = [
-      url,
-      "-o", "-",           // write to stdout
-      "-q",                // quiet
-      "-f", "bestaudio[ext=m4a]/bestaudio",   // preferred formats
-      "--no-playlist",
-      "--no-warnings"
-    ];
-
-    const ytdlProcess = spawn(YTDLP_BIN, ytdlArgs);
-
-
-    // Step 2 – ffmpeg reads from stdin, encodes to MP3, writes to stdout
+    // 2. Setup ffmpeg to encode to MP3
     const ffmpegArgs = [
       "-hide_banner", "-loglevel", "info",
       "-i", "pipe:0",           // read from stdin
@@ -50,11 +34,16 @@ const streamAudio = async (req, res) => {
     
     const ff = spawn(FFMPEG_BIN, ffmpegArgs);
 
-    // Pipe yt-dlp stream → ffmpeg
-    ytdlProcess.stdout.pipe(ff.stdin);
-
-    // Pipe ffmpeg output → HTTP response
+    // 3. Pipe ytdl -> ffmpeg -> res
+    ytdlStream.pipe(ff.stdin);
     ff.stdout.pipe(res);
+
+    // 4. Send headers
+    res.writeHead(200, {
+      "Content-Type": "audio/mpeg",
+      "Cache-Control": "no-cache",
+      "Transfer-Encoding": "chunked",
+    });
 
     // ─── Error and Close Logic ────────────────────────────────────────────────
     ff.stderr.on("data", (d) => {
@@ -73,24 +62,24 @@ const streamAudio = async (req, res) => {
       if (!res.writableEnded) res.end();
     });
     
-    ytdlProcess.on("error", (err) => {
-        console.error(`[Stream] yt-dlp process closed with error: ${err.message}`);
+    ytdlStream.on("error", (err) => {
+        console.error(`[Stream] ytdl-core error: ${err.message}`);
         ff.stdin.end();
     });
 
     // Cleanup on client disconnect
     req.on("close", () => {
-      console.log(`[Stream] Client closed connection for ${videoId}. Cleaning up processes.`);
+      console.log(`[Stream] Client closed connection for ${videoId}. Cleaning up.`);
       try {
-        if(ytdlProcess) ytdlProcess.kill("SIGKILL");
+        ytdlStream.destroy();
         ff.kill("SIGKILL");
       } catch (e) {
-        // Ignore errors during kill
+        // Ignore
       }
     });
 
   } catch (err) {
-    console.error(`[Stream] Error setting up stream with yt-dlp: ${err.message}`);
+    console.error(`[Stream] Fatal error: ${err.message}`);
     if (!res.headersSent) {
       return res.status(500).json({ message: "Failed to fetch audio stream", error: err.message });
     } else {
