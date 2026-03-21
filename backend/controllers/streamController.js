@@ -13,11 +13,12 @@ const YTDLP_BIN = "yt-dlp";
 // Check if yt-dlp is available in the system path
 let isYtdlpAvailable = false;
 try {
-  execSync(`${YTDLP_BIN} --version`, { stdio: "ignore" });
+  const version = execSync(`${YTDLP_BIN} --version`).toString().trim();
   isYtdlpAvailable = true;
-  console.log("[Stream] yt-dlp detected in system path.");
+  console.log(`[Stream] yt-dlp detected! Version: ${version}`);
 } catch (e) {
-  console.log("[Stream] yt-dlp not found. Falling back to ytdl-core library.");
+  console.log("[Stream] yt-dlp NOT found in system path. Fallback to ytdl-core.");
+  console.log(`[Stream] Debug: ${e.message}`);
 }
 
 // Helper to parse Netscape HTTP Cookie File into an array of cookie objects for ytdl-core agent
