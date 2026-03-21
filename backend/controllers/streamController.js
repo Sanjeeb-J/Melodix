@@ -1,9 +1,24 @@
-const { spawn } = require("child_process");
+const { spawn, execSync } = require("child_process");
+const fs = require("fs");
+const path = require("path");
+const os = require("os");
 const ffmpegStatic = require("ffmpeg-static");
 const ytdl = require("@distube/ytdl-core");
 
 // Use system ffmpeg on Railway/Docker, else fallback to ffmpeg-static for local
 const FFMPEG_BIN = process.env.FFMPEG_PATH || (process.env.RAILWAY_STATIC_URL ? "ffmpeg" : ffmpegStatic);
+// Use system yt-dlp
+const YTDLP_BIN = "yt-dlp";
+
+// Check if yt-dlp is available in the system path
+let isYtdlpAvailable = false;
+try {
+  execSync(`${YTDLP_BIN} --version`, { stdio: "ignore" });
+  isYtdlpAvailable = true;
+  console.log("[Stream] yt-dlp detected in system path.");
+} catch (e) {
+  console.log("[Stream] yt-dlp not found. Falling back to ytdl-core library.");
+}
 
 // Helper to parse Netscape HTTP Cookie File into an array of cookie objects for ytdl-core agent
 const parseCookiesToObjects = (cookieText) => {
@@ -43,98 +58,108 @@ const streamAudio = async (req, res) => {
   if (!videoId) return res.status(400).json({ message: "videoId is required" });
 
   const url = `https://www.youtube.com/watch?v=${videoId}`;
-  console.log(`[Stream] Starting ytdl-core + ffmpeg pipe for ${videoId}`);
+  let cookieFilePath = null;
 
   try {
-    let agent;
-    if (process.env.YOUTUBE_COOKIE) {
+    // Determine which engine to use
+    if (isYtdlpAvailable) {
+      console.log(`[Stream] Starting yt-dlp + ffmpeg pipe for ${videoId}`);
+      
+      const ytdlArgs = [
+        url,
+        "-o", "-",
+        "-q",
+        "-f", "bestaudio[ext=m4a]/bestaudio",
+        "--no-playlist",
+      ];
+
+      // Add cookies if available
+      if (process.env.YOUTUBE_COOKIE) {
+        cookieFilePath = path.join(os.tmpdir(), `cookie_${Date.now()}.txt`);
+        fs.writeFileSync(cookieFilePath, process.env.YOUTUBE_COOKIE);
+        ytdlArgs.push("--cookies", cookieFilePath);
+      }
+
+      const ytdlProcess = spawn(YTDLP_BIN, ytdlArgs);
+      
+      const ffmpegArgs = [
+        "-hide_banner", "-loglevel", "error",
+        "-i", "pipe:0",
+        "-vn", "-acodec", "libmp3lame", "-ab", "128k", "-f", "mp3", "pipe:1",
+      ];
+      
+      const ff = spawn(FFMPEG_BIN, ffmpegArgs);
+      ytdlProcess.stdout.pipe(ff.stdin);
+      ff.stdout.pipe(res);
+
+      res.writeHead(200, { "Content-Type": "audio/mpeg", "Cache-Control": "no-cache", "Transfer-Encoding": "chunked" });
+
+      ff.on("close", (code) => {
+        if (cookieFilePath && fs.existsSync(cookieFilePath)) fs.unlinkSync(cookieFilePath);
+        if (!res.writableEnded) res.end();
+      });
+
+      ytdlProcess.on("error", (err) => {
+          console.error(`[Stream] yt-dlp error: ${err.message}`);
+          ff.stdin.end();
+      });
+
+      req.on("close", () => {
         try {
-            const cookies = parseCookiesToObjects(process.env.YOUTUBE_COOKIE);
-            if (cookies.length > 0) {
-                agent = ytdl.createAgent(cookies);
-                console.log(`[Stream] ytdl-core agent created with ${cookies.length} cookies`);
-            }
-        } catch (e) {
-            console.error("[Stream] Failed to create ytdl agent:", e.message);
-        }
-    }
+          ytdlProcess.kill("SIGKILL");
+          ff.kill("SIGKILL");
+        } catch (e) {}
+      });
 
-    const options = {
-      filter: "audioonly",
-      quality: "highestaudio",
-      highWaterMark: 1 << 25, // 32MB buffer
-    };
-
-    if (agent) {
-        options.agent = agent;
-    }
-
-    // 1. Create ytdl stream
-    const ytdlStream = ytdl(url, options);
-
-    // 2. Setup ffmpeg to encode to MP3
-    const ffmpegArgs = [
-      "-hide_banner", "-loglevel", "info",
-      "-i", "pipe:0",           // read from stdin
-      "-vn",                    // no video
-      "-acodec", "libmp3lame",
-      "-ab", "128k",
-      "-f", "mp3",
-      "pipe:1",                 // write to stdout
-    ];
-    
-    const ff = spawn(FFMPEG_BIN, ffmpegArgs);
-
-    // 3. Pipe ytdl -> ffmpeg -> res
-    ytdlStream.pipe(ff.stdin);
-    ff.stdout.pipe(res);
-
-    // 4. Send headers
-    res.writeHead(200, {
-      "Content-Type": "audio/mpeg",
-      "Cache-Control": "no-cache",
-      "Transfer-Encoding": "chunked",
-    });
-
-    // ─── Error and Close Logic ────────────────────────────────────────────────
-    ff.stderr.on("data", (d) => {
-      const msg = d.toString().trim();
-      if (msg && (msg.toLowerCase().includes("error") || msg.toLowerCase().includes("failed"))) {
-        console.error(`[ffmpeg] ${msg}`);
+    } else {
+      // Fallback to ytdl-core
+      console.log(`[Stream] Starting ytdl-core + ffmpeg pipe for ${videoId}`);
+      let agent;
+      if (process.env.YOUTUBE_COOKIE) {
+          try {
+              const cookies = parseCookiesToObjects(process.env.YOUTUBE_COOKIE);
+              if (cookies.length > 0) {
+                  agent = ytdl.createAgent(cookies);
+              }
+          } catch (e) {
+              console.error("[Stream] Failed to create ytdl agent:", e.message);
+          }
       }
-    });
 
-    ff.on("error", (err) => {
-      console.error(`[Stream] ffmpeg failed to start: ${err.message}`);
-    });
+      const options = { filter: "audioonly", quality: "highestaudio", highWaterMark: 1 << 25 };
+      if (agent) options.agent = agent;
 
-    ff.on("close", (code) => {
-      console.log(`[Stream] ffmpeg process closed with code ${code} for ${videoId}`);
-      if (!res.writableEnded) res.end();
-    });
-    
-    ytdlStream.on("error", (err) => {
-        console.error(`[Stream] ytdl-core error: ${err.message}`);
-        ff.stdin.end();
-    });
+      const ytdlStream = ytdl(url, options);
 
-    // Cleanup on client disconnect
-    req.on("close", () => {
-      console.log(`[Stream] Client closed connection for ${videoId}. Cleaning up.`);
-      try {
-        ytdlStream.destroy();
-        ff.kill("SIGKILL");
-      } catch (e) {
-        // Ignore
-      }
-    });
+      const ffmpegArgs = [
+        "-hide_banner", "-loglevel", "error",
+        "-i", "pipe:0", "-vn", "-acodec", "libmp3lame", "-ab", "128k", "-f", "mp3", "pipe:1",
+      ];
+      
+      const ff = spawn(FFMPEG_BIN, ffmpegArgs);
+      ytdlStream.pipe(ff.stdin);
+      ff.stdout.pipe(res);
+
+      res.writeHead(200, { "Content-Type": "audio/mpeg", "Cache-Control": "no-cache", "Transfer-Encoding": "chunked" });
+
+      ff.on("close", () => { if (!res.writableEnded) res.end(); });
+      ytdlStream.on("error", (err) => { console.error(`[Stream] ytdl-core error: ${err.message}`); ff.stdin.end(); });
+
+      req.on("close", () => {
+        try {
+            ytdlStream.destroy();
+            ff.kill("SIGKILL");
+        } catch (e) {}
+      });
+    }
 
   } catch (err) {
     console.error(`[Stream] Fatal error: ${err.message}`);
+    if (cookieFilePath && fs.existsSync(cookieFilePath)) fs.unlinkSync(cookieFilePath);
     if (!res.headersSent) {
-      return res.status(500).json({ message: "Failed to fetch audio stream", error: err.message });
+      res.status(500).json({ message: "Failed to fetch audio stream", error: err.message });
     } else {
-        res.end();
+      res.end();
     }
   }
 };
