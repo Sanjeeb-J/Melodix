@@ -24,17 +24,20 @@ try {
 const parseCookiesToObjects = (cookieText) => {
     if (!cookieText) return [];
     
+    // Replace literal '\n' strings with real newlines just in case
+    const normalizedText = cookieText.replace(/\\n/g, "\n");
+
     // If it looks like a JSON array already, try parsing it
-    if (cookieText.trim().startsWith("[")) {
+    if (normalizedText.trim().startsWith("[")) {
         try {
-            return JSON.parse(cookieText);
+            return JSON.parse(normalizedText);
         } catch (e) {
             console.error("[Stream] Error parsing YOUTUBE_COOKIE as JSON:", e.message);
         }
     }
 
     const cookies = [];
-    const lines = cookieText.split("\n");
+    const lines = normalizedText.split("\n");
     for (const line of lines) {
         if (!line.trim() || line.startsWith("#")) continue;
         const parts = line.split("\t");
