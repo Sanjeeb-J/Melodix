@@ -5,6 +5,26 @@ const ytdl = require("@distube/ytdl-core");
 // Use system ffmpeg on Railway/Docker, else fallback to ffmpeg-static for local
 const FFMPEG_BIN = process.env.FFMPEG_PATH || (process.env.RAILWAY_STATIC_URL ? "ffmpeg" : ffmpegStatic);
 
+// Helper to parse Netscape HTTP Cookie File into a cookie string
+const parseCookies = (cookieText) => {
+    if (!cookieText) return "";
+    // If it's already a name=value string, return it
+    if (cookieText.includes("=") && !cookieText.includes("\t")) return cookieText;
+
+    const cookies = [];
+    const lines = cookieText.split("\n");
+    for (const line of lines) {
+        if (!line.trim() || line.startsWith("#")) continue;
+        const parts = line.split("\t");
+        if (parts.length >= 7) {
+            const name = parts[parts.length - 2];
+            const value = parts[parts.length - 1].trim();
+            cookies.push(`${name}=${value}`);
+        }
+    }
+    return cookies.join("; ");
+};
+
 // ─── Controller ───────────────────────────────────────────────────────────────
 const streamAudio = async (req, res) => {
   const { videoId } = req.params;
@@ -14,11 +34,27 @@ const streamAudio = async (req, res) => {
   console.log(`[Stream] Starting ytdl-core + ffmpeg pipe for ${videoId}`);
 
   try {
+    const requestOptions = {
+        headers: {
+            "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+        }
+    };
+
+    // Support for YouTube cookies to bypass 429 errors (Too Many Requests)
+    if (process.env.YOUTUBE_COOKIE) {
+        try {
+            requestOptions.headers.cookie = parseCookies(process.env.YOUTUBE_COOKIE);
+        } catch (e) {
+            console.error("[Stream] Error parsing YOUTUBE_COOKIE:", e.message);
+        }
+    }
+
     // 1. Create ytdl stream
     const ytdlStream = ytdl(url, {
       filter: "audioonly",
       quality: "highestaudio",
       highWaterMark: 1 << 25, // 32MB buffer
+      requestOptions: requestOptions
     });
 
     // 2. Setup ffmpeg to encode to MP3
