@@ -364,8 +364,13 @@ function Sidebar({
 // ─── HomeView ──────────────────────────────────────────
 function HomeView({ playlists, onPlaylistClick, onCreatePlaylist, onMarkPlayed }) {
   const [showAll, setShowAll] = useState(false);
+  const [searchQuery, setSearchQuery] = useState("");
   const { playSong } = usePlayer();
   const hour = new Date().getHours();
+
+  const filteredPlaylists = playlists.filter(p =>
+    p.name.toLowerCase().includes(searchQuery.toLowerCase())
+  );
   
   let greeting = "Good evening";
   if (hour >= 5 && hour < 12) greeting = "Good morning";
@@ -420,8 +425,8 @@ function HomeView({ playlists, onPlaylistClick, onCreatePlaylist, onMarkPlayed }
       )}
 
       {/* All playlists section */}
-      <div className="flex items-center justify-between mb-4">
-        <h3 className="text-xl font-black">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-4">
+        <h3 className="text-xl font-black whitespace-nowrap">
           {showAll ? (
             <div className="flex items-center gap-2">
               <button 
@@ -434,14 +439,28 @@ function HomeView({ playlists, onPlaylistClick, onCreatePlaylist, onMarkPlayed }
             </div>
           ) : "Your playlists"}
         </h3>
-        {!showAll && (
-          <button
-            onClick={() => setShowAll(true)}
-            className="text-sm text-sp-dim hover:text-white font-semibold transition-colors"
-          >
-            Show all
-          </button>
-        )}
+        <div className="flex items-center gap-3 w-full sm:w-auto">
+          {playlists.length > 0 && (
+            <div className="relative flex-1 sm:w-64">
+              <Search size={16} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-sp-muted" />
+              <input
+                type="text"
+                placeholder="Search your playlists..."
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                className="w-full bg-[rgba(255,255,255,0.06)] focus:bg-[rgba(255,255,255,0.1)] text-white placeholder:text-[#737373] rounded-md py-1.5 pl-10 pr-4 text-sm font-semibold outline-none transition-colors border border-transparent focus:border-[rgba(255,255,255,0.2)]"
+              />
+            </div>
+          )}
+          {!showAll && (
+            <button
+              onClick={() => setShowAll(true)}
+              className="text-sm text-sp-dim hover:text-white font-semibold transition-colors flex-shrink-0"
+            >
+              Show all
+            </button>
+          )}
+        </div>
       </div>
 
       {playlists.length === 0 ? (
@@ -456,9 +475,13 @@ function HomeView({ playlists, onPlaylistClick, onCreatePlaylist, onMarkPlayed }
             Create playlist
           </button>
         </div>
+      ) : filteredPlaylists.length === 0 ? (
+        <div className="py-12 text-center text-sp-muted">
+          <p className="text-sm font-bold">No playlists match your search</p>
+        </div>
       ) : (
         <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-4">
-          {playlists.map((p) => (
+          {filteredPlaylists.map((p) => (
             <PlaylistCard 
               key={p._id} 
               playlist={p} 
