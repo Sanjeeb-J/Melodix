@@ -17,7 +17,6 @@ import {
 } from "../services/playlistService";
 import { searchYouTube } from "../services/youtubeService";
 import { getPlaylistCover } from "../utils/playlistCover";
-import { updateUserProfile, deleteUserAccount } from "../services/authService";
 import {
   Home,
   Search,
@@ -46,7 +45,6 @@ import {
   Menu,
   ExternalLink,
   LogOut,
-  User,
 } from "lucide-react";
 
 // ─── Helpers ───────────────────────────────────────────
@@ -225,7 +223,6 @@ function Sidebar({
   onPlaylistClick,
   onCreatePlaylist,
   onLogout,
-  onAccountSettings,
   isOpen,
   onClose,
 }) {
@@ -274,7 +271,7 @@ function Sidebar({
             Home
           </button>
           <button
-            onClick={() => { setView("search"); onClose && onClose(); }}
+            onClick={() => setView("search")}
             className={`flex items-center gap-4 px-3 py-2 rounded-full text-sm font-bold transition-all ${
               view === "search"
                 ? "text-white bg-[rgba(255,255,255,0.1)]"
@@ -285,14 +282,7 @@ function Sidebar({
             Search
           </button>
           <button
-            onClick={onAccountSettings}
-            className="flex items-center gap-4 px-3 py-2 rounded-full text-sm font-bold text-sp-dim hover:text-white transition-all"
-          >
-            <User size={22} />
-            Account
-          </button>
-          <button
-            onClick={() => { onLogout(); onClose && onClose(); }}
+            onClick={onLogout}
             className="flex items-center gap-4 px-3 py-2 rounded-full text-sm font-bold text-sp-dim hover:text-white transition-all"
           >
             <LogOut size={22} />
@@ -1198,111 +1188,6 @@ function CreatePlaylistModal({ onClose, onCreate }) {
   );
 }
 
-// ─── AccountModal ───────────────────────────────────────
-function AccountModal({ onClose }) {
-  const { user, token, setUser, logout } = useContext(AuthContext);
-  const { showToast } = useToast();
-  const [name, setName] = useState(user?.name || "");
-  const [password, setPassword] = useState("");
-  const [loading, setLoading] = useState(false);
-  const [deleting, setDeleting] = useState(false);
-
-  const handleUpdate = async (e) => {
-    e.preventDefault();
-    setLoading(true);
-    try {
-      const updated = await updateUserProfile(token, { name, password });
-      setUser(updated);
-      showToast("Profile updated", "success");
-      setPassword("");
-    } catch (err) {
-      showToast(err.message || "Failed to update", "error");
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const handleDelete = async () => {
-    if (!window.confirm("Are you sure you want to delete your account? This action cannot be undone.")) return;
-    setDeleting(true);
-    try {
-      await deleteUserAccount(token);
-      showToast("Account deleted", "success");
-      logout();
-    } catch (err) {
-      showToast(err.message || "Failed to delete account", "error");
-    } finally {
-      setDeleting(false);
-    }
-  };
-
-  return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm">
-      <div className="w-full max-w-sm rounded-xl p-6 animate-in" style={{ background: "#282828" }}>
-        <div className="flex items-center justify-between mb-6">
-          <h3 className="font-black text-lg">Account</h3>
-          <button onClick={onClose} className="text-sp-dim hover:text-white transition-colors">
-            <X size={20} />
-          </button>
-        </div>
-        
-        <p className="text-sm font-semibold mb-4 text-sp-dim">
-          Email: <span className="text-white">{user?.email || "Unknown"}</span>
-        </p>
-
-        <form onSubmit={handleUpdate} className="space-y-4 mb-6">
-          <div>
-            <label className="block text-xs font-bold text-sp-dim uppercase tracking-widest mb-2">Username</label>
-            <input
-              type="text"
-              value={name}
-              onChange={(e) => setName(e.target.value)}
-              className="w-full bg-[#3a3a3a] text-white rounded-md px-4 py-3 text-sm font-semibold outline-none focus:ring-2 focus:ring-white/30"
-            />
-          </div>
-          <div>
-            <label className="block text-xs font-bold text-sp-dim uppercase tracking-widest mb-2">New Password (optional)</label>
-            <input
-              type="password"
-              placeholder="Leave blank to keep current"
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              className="w-full bg-[#3a3a3a] text-white rounded-md px-4 py-3 text-sm font-semibold outline-none focus:ring-2 focus:ring-white/30"
-            />
-          </div>
-          <div className="flex justify-end gap-3 pt-2">
-            <button
-              type="button"
-              onClick={onClose}
-              className="px-5 py-2.5 text-sm font-bold text-white hover:scale-105 transition-transform"
-            >
-              Close
-            </button>
-            <button
-              type="submit"
-              disabled={loading}
-              className="px-6 py-2.5 bg-sp-green text-black font-bold rounded-full text-sm hover:bg-sp-green-h hover:scale-105 transition-all disabled:opacity-50"
-            >
-              {loading ? <Loader2 size={16} className="animate-spin" /> : "Save"}
-            </button>
-          </div>
-        </form>
-
-        <div className="pt-4 border-t border-[rgba(255,255,255,0.06)]">
-            <button
-              type="button"
-              onClick={handleDelete}
-              disabled={deleting}
-              className="w-full py-2.5 bg-transparent border border-red-500/50 text-red-500 hover:bg-red-500 hover:text-white font-bold rounded-full text-sm transition-all disabled:opacity-50"
-            >
-              {deleting ? "Deleting..." : "Delete Account"}
-            </button>
-        </div>
-      </div>
-    </div>
-  );
-}
-
 // ─── Dashboard (root) ──────────────────────────────────
 export default function Dashboard() {
   const [playlists, setPlaylists] = useState([]);
@@ -1310,7 +1195,6 @@ export default function Dashboard() {
   const [view, setView] = useState("home"); // "home" | "search" | "playlist-<id>"
   const [selectedPlaylist, setSelectedPlaylist] = useState(null);
   const [showCreate, setShowCreate] = useState(false);
-  const [showAccount, setShowAccount] = useState(false);
   const { showToast } = useToast();
   const navigate = useNavigate();
   const { logout } = useContext(AuthContext);
@@ -1406,7 +1290,6 @@ export default function Dashboard() {
           onPlaylistClick={(p) => { handlePlaylistClick(p); setIsSidebarOpen(false); }}
           onCreatePlaylist={() => { setShowCreate(true); setIsSidebarOpen(false); }}
           onLogout={handleLogout}
-          onAccountSettings={() => { setShowAccount(true); setIsSidebarOpen(false); }}
           isOpen={isSidebarOpen}
           onClose={() => setIsSidebarOpen(false)}
         />
@@ -1479,13 +1362,6 @@ export default function Dashboard() {
         <CreatePlaylistModal
           onClose={() => setShowCreate(false)}
           onCreate={handleCreate}
-        />
-      )}
-
-      {/* Account Modal */}
-      {showAccount && (
-        <AccountModal
-          onClose={() => setShowAccount(false)}
         />
       )}
     </div>
