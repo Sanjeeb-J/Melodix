@@ -3,12 +3,10 @@ import Auth from "./pages/Auth";
 import Dashboard from "./pages/Dashboard";
 import ProtectedRoute from "./components/ProtectedRoute";
 import { ToastProvider } from "./components/ToastContainer";
-import InstallPWA from "./components/InstallPWA";
 
 function App() {
   return (
     <ToastProvider>
-      <InstallPWA />
       <Routes>
         <Route path="/" element={<Auth />} />;
         <Route
