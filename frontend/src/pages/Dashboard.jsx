@@ -636,6 +636,7 @@ function PlaylistView({ playlist, onBack, onUpdate, onDelete }) {
   const [nameInput, setNameInput] = useState(playlist.name);
   const [deletingId, setDeletingId] = useState(null);
   const [isSearchOpen, setIsSearchOpen] = useState(false);
+  const [searchQuery, setSearchQuery] = useState("");
 
   // Edit song state
   const [editingSong, setEditingSong] = useState(null);
@@ -643,17 +644,22 @@ function PlaylistView({ playlist, onBack, onUpdate, onDelete }) {
   const [editSongArtist, setEditSongArtist] = useState("");
   const [savingEdit, setSavingEdit] = useState(false);
 
+  const filteredSongs = playlist.songs?.filter(song =>
+    song.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+    (song.artist && song.artist.toLowerCase().includes(searchQuery.toLowerCase()))
+  ) || [];
+
   const handlePlay = (song, idx) => {
     if (currentSong?.youtubeId === song.youtubeId && isPlaying) {
       togglePlay();
     } else {
-      playSong(song, playlist.songs, idx);
+      playSong(song, filteredSongs, idx);
     }
   };
 
   const handlePlayAll = () => {
-    if (!playlist.songs?.length) return;
-    playSong(playlist.songs[0], playlist.songs, 0);
+    if (!filteredSongs.length) return;
+    playSong(filteredSongs[0], filteredSongs, 0);
   };
 
   const handleRename = async () => {
@@ -769,7 +775,7 @@ function PlaylistView({ playlist, onBack, onUpdate, onDelete }) {
       <div className="flex items-center gap-4 px-2 mb-6">
         <button
           onClick={handlePlayAll}
-          disabled={!playlist.songs?.length}
+          disabled={!filteredSongs.length}
           className="w-14 h-14 bg-sp-green rounded-full flex items-center justify-center hover:scale-105 transition-transform disabled:opacity-40 shadow-xl"
         >
           <Play size={24} fill="black" className="text-black ml-1" />
@@ -789,6 +795,22 @@ function PlaylistView({ playlist, onBack, onUpdate, onDelete }) {
         </button>
       </div>
 
+      {/* Playlist Search Bar */}
+      {playlist.songs?.length > 0 && (
+        <div className="px-2 mb-6">
+          <div className="relative max-w-sm">
+            <Search size={16} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-sp-muted" />
+            <input
+              type="text"
+              placeholder="Search in playlist..."
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              className="w-full bg-[rgba(255,255,255,0.06)] focus:bg-[rgba(255,255,255,0.1)] text-white placeholder:text-[#737373] rounded-md py-2 pl-10 pr-4 text-sm font-semibold outline-none transition-colors border border-transparent focus:border-[rgba(255,255,255,0.2)]"
+            />
+          </div>
+        </div>
+      )}
+
       {/* Song list */}
       {playlist.songs?.length > 0 ? (
         <div className="bg-[#121212] lg:bg-transparent">
@@ -801,7 +823,13 @@ function PlaylistView({ playlist, onBack, onUpdate, onDelete }) {
             <span />
           </div>
 
-          {playlist.songs.map((song, idx) => (
+          {filteredSongs.length === 0 && (
+            <div className="py-12 text-center text-sp-muted">
+              <p className="text-sm font-bold">No songs match your search</p>
+            </div>
+          )}
+
+          {filteredSongs.map((song, idx) => (
             <div
               key={song._id}
               onClick={() => handlePlay(song, idx)}
