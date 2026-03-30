@@ -529,7 +529,7 @@ function PlaylistCard({ playlist: p, onClick }) {
 }
 
 // ─── SearchView ────────────────────────────────────────
-function SearchView({ selectedPlaylist, playlists, onPlaylistSelect }) {
+function SearchView({ selectedPlaylist, playlists, onPlaylistSelect, onUpdate }) {
   const [query, setQuery] = useState("");
   const [results, setResults] = useState([]);
   const [loading, setLoading] = useState(false);
@@ -556,7 +556,7 @@ function SearchView({ selectedPlaylist, playlists, onPlaylistSelect }) {
     }
     setAddingId(song.videoId);
     try {
-      await addSongFromYouTube(selectedPlaylist._id, {
+      const res = await addSongFromYouTube(selectedPlaylist._id, {
         name: song.title,
         artist: song.artist,
         album: "YouTube",
@@ -565,6 +565,9 @@ function SearchView({ selectedPlaylist, playlists, onPlaylistSelect }) {
         youtubeLink: song.youtubeLink,
         thumbnail: song.thumbnail,
       });
+      if (onUpdate && res.playlist) {
+        onUpdate(res.playlist);
+      }
       showToast(`Added to ${selectedPlaylist.name}`, "success");
     } catch {
       showToast("Failed to add song", "error");
@@ -1338,6 +1341,7 @@ export default function Dashboard() {
                 selectedPlaylist={selectedPlaylist}
                 playlists={playlists}
                 onPlaylistSelect={(p) => setSelectedPlaylist(p)}
+                onUpdate={handlePlaylistUpdate}
               />
             )}
 
