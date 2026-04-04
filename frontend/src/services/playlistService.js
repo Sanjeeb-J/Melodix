@@ -24,7 +24,7 @@ export const getPlaylists = async () => {
   return res.json();
 };
 
-export const createPlaylist = async (name) => {
+export const createPlaylist = async (name, importUrl = "") => {
   const token = localStorage.getItem("token");
 
   const res = await fetch(API_URL, {
@@ -33,10 +33,13 @@ export const createPlaylist = async (name) => {
       "Content-Type": "application/json",
       Authorization: `Bearer ${token}`,
     },
-    body: JSON.stringify({ name }),
+    body: JSON.stringify({ name, importUrl }),
   });
 
-  if (!res.ok) throw new Error("Failed to create playlist");
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}));
+    throw new Error(err.message || "Failed to create playlist");
+  }
   return res.json();
 };
 

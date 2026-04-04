@@ -1133,13 +1133,14 @@ function AddSongsModal({ playlist, onUpdate, onClose }) {
 // ─── CreatePlaylistModal ────────────────────────────────
 function CreatePlaylistModal({ onClose, onCreate }) {
   const [name, setName] = useState("My Playlist #1");
+  const [spotifyUrl, setSpotifyUrl] = useState("");
   const [loading, setLoading] = useState(false);
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    if (!name.trim()) return;
+    if (!name.trim() && !spotifyUrl.trim()) return;
     setLoading(true);
-    await onCreate(name);
+    await onCreate(name.trim(), spotifyUrl.trim());
     onClose();
   };
 
@@ -1162,13 +1163,35 @@ function CreatePlaylistModal({ onClose, onCreate }) {
           >
             <ListMusic size={64} className="text-sp-muted" />
           </div>
-          <input
-            autoFocus
-            type="text"
-            value={name}
-            onChange={(e) => setName(e.target.value)}
-            className="w-full bg-[#3a3a3a] text-white rounded-md px-4 py-3 text-sm font-semibold outline-none focus:ring-2 focus:ring-white/30"
-          />
+          <div className="space-y-2">
+            <label className="block text-xs text-sp-dim font-bold uppercase tracking-wider">
+              Playlist name
+            </label>
+            <input
+              autoFocus
+              type="text"
+              value={name}
+              onChange={(e) => setName(e.target.value)}
+              placeholder="My Playlist #1"
+              className="w-full bg-[#3a3a3a] text-white rounded-md px-4 py-3 text-sm font-semibold outline-none focus:ring-2 focus:ring-white/30"
+            />
+          </div>
+          <div className="space-y-2">
+            <label className="block text-xs text-sp-dim font-bold uppercase tracking-wider">
+              Spotify playlist link
+            </label>
+            <input
+              type="url"
+              value={spotifyUrl}
+              onChange={(e) => setSpotifyUrl(e.target.value)}
+              placeholder="https://open.spotify.com/playlist/..."
+              className="w-full bg-[#3a3a3a] text-white rounded-md px-4 py-3 text-sm font-semibold outline-none focus:ring-2 focus:ring-white/30"
+            />
+            <p className="text-xs text-sp-dim leading-relaxed">
+              Paste a public Spotify playlist link to import its songs as a new playable playlist.
+              If you leave the name empty, Melodix will use the Spotify playlist name.
+            </p>
+          </div>
           <div className="flex gap-3 justify-end">
             <button
               type="button"
@@ -1179,10 +1202,10 @@ function CreatePlaylistModal({ onClose, onCreate }) {
             </button>
             <button
               type="submit"
-              disabled={loading}
+              disabled={loading || (!name.trim() && !spotifyUrl.trim())}
               className="px-6 py-2.5 bg-sp-green text-black font-bold rounded-full text-sm hover:bg-sp-green-h hover:scale-105 transition-all"
             >
-              {loading ? <Loader2 size={16} className="animate-spin" /> : "Create"}
+              {loading ? <Loader2 size={16} className="animate-spin" /> : spotifyUrl.trim() ? "Import" : "Create"}
             </button>
           </div>
         </form>
@@ -1223,14 +1246,18 @@ export default function Dashboard() {
 
   useEffect(() => { fetchPlaylists(); }, []);
 
-  const handleCreate = async (name) => {
+  const handleCreate = async (name, importUrl = "") => {
     try {
-      const res = await createPlaylist(name);
+      const res = await createPlaylist(name, importUrl);
       setPlaylists((prev) => [res.playlist, ...prev]);
       handlePlaylistClick(res.playlist);
-      showToast(`Created "${name}"`, "success");
-    } catch {
-      showToast("Failed to create playlist", "error");
+      const playlistName = res.playlist?.name || name || "playlist";
+      const successMessage = importUrl
+        ? `Imported "${playlistName}" with ${res.importedCount ?? res.playlist?.songs?.length ?? 0} songs`
+        : `Created "${playlistName}"`;
+      showToast(successMessage, "success");
+    } catch (error) {
+      showToast(error.message || "Failed to create playlist", "error");
     }
   };
 
