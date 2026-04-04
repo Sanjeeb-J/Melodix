@@ -180,6 +180,100 @@ const formatSpotifyDuration = (durationMs = 0) => {
   return `${minutes}:${String(seconds).padStart(2, "0")}`;
 };
 
+const parseDurationToSeconds = (value) => {
+  if (!value || typeof value !== "string" || value === "--:--") return null;
+
+  const parts = value.split(":").map((part) => Number(part));
+  if (parts.some((part) => Number.isNaN(part))) return null;
+
+  if (parts.length === 2) {
+    return parts[0] * 60 + parts[1];
+  }
+
+  if (parts.length === 3) {
+    return parts[0] * 3600 + parts[1] * 60 + parts[2];
+  }
+
+  return null;
+};
+
+const normalizeForMatch = (value = "") =>
+  value
+    .toLowerCase()
+    .replace(/\([^)]*\)|\[[^\]]*\]/g, " ")
+    .replace(/[^a-z0-9\s]/g, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+
+const getWordSet = (value = "") =>
+  new Set(
+    normalizeForMatch(value)
+      .split(" ")
+      .map((word) => word.trim())
+      .filter((word) => word.length > 1)
+  );
+
+const countIntersection = (left, right) => {
+  let count = 0;
+
+  for (const word of left) {
+    if (right.has(word)) count += 1;
+  }
+
+  return count;
+};
+
+const scoreYouTubeCandidate = (track, candidate) => {
+  const titleWords = getWordSet(candidate.title);
+  const artistWords = getWordSet(track.artist);
+  const trackWords = getWordSet(track.name);
+  const channelWords = getWordSet(candidate.channelTitle);
+
+  let score = 0;
+
+  score += countIntersection(trackWords, titleWords) * 8;
+  score += countIntersection(artistWords, titleWords) * 6;
+  score += countIntersection(artistWords, channelWords) * 5;
+
+  const normalizedTitle = normalizeForMatch(candidate.title);
+  const normalizedChannel = normalizeForMatch(candidate.channelTitle);
+
+  if (normalizedTitle.includes(normalizeForMatch(track.name))) {
+    score += 18;
+  }
+
+  if (normalizedTitle.includes("official")) score += 6;
+  if (normalizedTitle.includes("audio")) score += 7;
+  if (normalizedTitle.includes("lyric")) score += 2;
+  if (normalizedTitle.includes("music video")) score += 3;
+  if (normalizedChannel.includes("topic")) score += 5;
+  if (normalizedChannel.includes(normalizeForMatch(track.artist))) score += 10;
+
+  if (
+    normalizedTitle.includes("live") ||
+    normalizedTitle.includes("karaoke") ||
+    normalizedTitle.includes("sped up") ||
+    normalizedTitle.includes("slowed") ||
+    normalizedTitle.includes("nightcore") ||
+    normalizedTitle.includes("8d")
+  ) {
+    score -= 18;
+  }
+
+  const trackDurationSeconds = parseDurationToSeconds(track.duration);
+  if (trackDurationSeconds && candidate.durationSeconds) {
+    const diff = Math.abs(trackDurationSeconds - candidate.durationSeconds);
+
+    if (diff <= 2) score += 25;
+    else if (diff <= 5) score += 18;
+    else if (diff <= 10) score += 10;
+    else if (diff <= 20) score += 4;
+    else score -= Math.min(20, diff);
+  }
+
+  return score;
+};
+
 const getSpotifyAccessToken = async () => {
   const clientId = process.env.SPOTIFY_CLIENT_ID;
   const clientSecret = process.env.SPOTIFY_CLIENT_SECRET;
@@ -310,7 +404,7 @@ const searchYouTubeTrack = async (track) => {
     throw new Error("YouTube API key is missing");
   }
 
-  const query = `${track.name} ${track.artist} audio`;
+  const query = `${track.name} ${track.artist} official audio`;
 
   const searchResponse = await axios.get(
     "https://www.googleapis.com/youtube/v3/search",
@@ -319,47 +413,80 @@ const searchYouTubeTrack = async (track) => {
         part: "snippet",
         q: query,
         type: "video",
-        maxResults: 1,
+        videoEmbeddable: "true",
+        maxResults: 8,
         key: apiKey,
       },
     }
   );
 
-  const item = searchResponse.data.items?.[0];
-  const videoId = item?.id?.videoId;
-  if (!videoId) return null;
+  const candidates = (searchResponse.data.items || [])
+    .map((item) => ({
+      videoId: item?.id?.videoId,
+      title: item?.snippet?.title || "",
+      channelTitle: item?.snippet?.channelTitle || "",
+      thumbnail:
+        item?.snippet?.thumbnails?.medium?.url ||
+        item?.snippet?.thumbnails?.high?.url ||
+        item?.snippet?.thumbnails?.default?.url ||
+        "",
+    }))
+    .filter((item) => item.videoId && item.thumbnail);
+
+  if (!candidates.length) return null;
 
   const detailsResponse = await axios.get(
     "https://www.googleapis.com/youtube/v3/videos",
     {
       params: {
-        part: "contentDetails,status",
-        id: videoId,
+        part: "contentDetails,status,snippet",
+        id: candidates.map((item) => item.videoId).join(","),
         key: apiKey,
       },
     }
   );
 
-  const details = detailsResponse.data.items?.[0];
-  if (!details || details.status?.embeddable === false || details.status?.privacyStatus === "private") {
-    return null;
-  }
+  const detailMap = new Map(
+    (detailsResponse.data.items || []).map((item) => [item.id, item])
+  );
 
-  const thumb =
-    item.snippet?.thumbnails?.medium?.url ||
-    item.snippet?.thumbnails?.high?.url ||
-    item.snippet?.thumbnails?.default?.url;
+  const rankedCandidates = candidates
+    .map((candidate) => {
+      const details = detailMap.get(candidate.videoId);
+      if (!details) return null;
+      if (details.status?.embeddable === false) return null;
+      if (details.status?.privacyStatus === "private") return null;
 
-  if (!thumb) return null;
+      const duration = formatDuration(details.contentDetails?.duration);
+      const durationSeconds = parseDurationToSeconds(duration);
+
+      return {
+        ...candidate,
+        title: details.snippet?.title || candidate.title,
+        channelTitle: details.snippet?.channelTitle || candidate.channelTitle,
+        duration,
+        durationSeconds,
+        score: scoreYouTubeCandidate(track, {
+          title: details.snippet?.title || candidate.title,
+          channelTitle: details.snippet?.channelTitle || candidate.channelTitle,
+          durationSeconds,
+        }),
+      };
+    })
+    .filter(Boolean)
+    .sort((left, right) => right.score - left.score);
+
+  const bestMatch = rankedCandidates[0];
+  if (!bestMatch) return null;
 
   return {
     name: track.name,
     artist: track.artist,
     album: track.album || "Spotify",
-    duration: formatDuration(details.contentDetails?.duration) || track.duration,
-    youtubeId: videoId,
-    youtubeLink: `https://www.youtube.com/watch?v=${videoId}`,
-    thumbnail: thumb,
+    duration: bestMatch.duration || track.duration,
+    youtubeId: bestMatch.videoId,
+    youtubeLink: `https://www.youtube.com/watch?v=${bestMatch.videoId}`,
+    thumbnail: bestMatch.thumbnail,
   };
 };
 
