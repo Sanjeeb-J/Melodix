@@ -407,13 +407,20 @@ export const PlayerProvider = ({ children }) => {
     if (!player?.loadVideoById) return;
 
     player.loadVideoById(videoId);
+  }, [currentSong, stopProgressTimer]);
+
+  useEffect(() => {
+    const player = playerRef.current;
+    if (!player) return;
+
     if (volume <= 0 || isMuted) {
-      player.mute();
-    } else {
-      player.unMute?.();
-      player.setVolume?.(Math.round(volume * 100));
+      player.mute?.();
+      return;
     }
-  }, [currentSong, isMuted, stopProgressTimer, volume]);
+
+    player.unMute?.();
+    player.setVolume?.(Math.round(volume * 100));
+  }, [volume, isMuted]);
 
   return (
     <PlayerContext.Provider

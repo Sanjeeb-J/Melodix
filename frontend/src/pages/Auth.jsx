@@ -80,9 +80,9 @@ function Auth() {
   const isRegister = view === "register";
   const isForgot = view === "forgot";
 
-  return (
-    <div 
-      className="relative min-h-screen flex items-center justify-center overflow-hidden text-white bg-cover bg-center px-4"
+    return (
+      <div 
+      className="relative min-h-screen overflow-y-auto text-white bg-cover bg-center px-4 py-6 md:py-10"
       style={{ backgroundImage: `url(${authBg})` }}
     >
       {/* Enhanced Background Overlays */}
@@ -90,7 +90,7 @@ function Auth() {
       <div className="absolute inset-0 bg-[radial-gradient(circle_at_center,transparent_0%,rgba(0,0,0,0.85)_100%)] z-0" />
       
       {/* Layout Content Wrapper */}
-      <div className="relative z-10 flex flex-col md:flex-row items-center w-full max-w-5xl gap-10 md:gap-12 lg:gap-20 py-10 md:py-0">
+      <div className="relative z-10 flex min-h-[calc(100vh-3rem)] md:min-h-[calc(100vh-5rem)] flex-col justify-center md:flex-row md:items-center w-full max-w-5xl gap-10 md:gap-12 lg:gap-20 py-6 md:py-0 mx-auto">
         
         {/* Left Side: Branding & Quote */}
         <div className="w-full md:w-[45%] flex flex-col justify-center animate-in">
