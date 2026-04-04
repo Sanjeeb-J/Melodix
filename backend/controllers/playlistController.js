@@ -147,6 +147,13 @@ let spotifyTokenCache = {
   expiresAt: 0,
 };
 
+const decodeHtmlEntities = (value = "") =>
+  value
+    .replace(/&#x27;/g, "'")
+    .replace(/&#39;/g, "'")
+    .replace(/&quot;/g, '"')
+    .replace(/&amp;/g, "&");
+
 const parseSpotifyPlaylistId = (value) => {
   if (!value) return null;
 
@@ -204,6 +211,97 @@ const getSpotifyAccessToken = async () => {
   };
 
   return spotifyTokenCache.accessToken;
+};
+
+const scrapeSpotifyTrackDetails = async (trackUrl) => {
+  const response = await axios.get(trackUrl, {
+    headers: {
+      "User-Agent": "Mozilla/5.0",
+    },
+  });
+
+  const html = response.data;
+  const titleMatch = html.match(/<meta property="og:title" content="([^"]+)"/i);
+  const descMatch = html.match(/<meta property="og:description" content="([^"]+)"/i);
+
+  const name = decodeHtmlEntities(titleMatch?.[1] || "").trim();
+  const description = decodeHtmlEntities(descMatch?.[1] || "").trim();
+
+  if (!name || !description) return null;
+
+  const parts = description.split("·").map((part) => part.trim()).filter(Boolean);
+  const artist = parts[0] || "Unknown artist";
+
+  return {
+    name,
+    artist,
+    album: "Spotify",
+    duration: "--:--",
+  };
+};
+
+const scrapeSpotifyPlaylistSongs = async (playlistUrl) => {
+  const response = await axios.get(playlistUrl, {
+    headers: {
+      "User-Agent": "Mozilla/5.0",
+    },
+  });
+
+  const html = response.data;
+  const playlistTitleMatch = html.match(/<meta property="og:title" content="([^"]+)"/i);
+  const playlistTitle = decodeHtmlEntities(playlistTitleMatch?.[1] || "").trim();
+  const playlistDescriptionMatch = html.match(/<meta property="og:description" content="([^"]+)"/i);
+  const playlistDescription = decodeHtmlEntities(playlistDescriptionMatch?.[1] || "");
+  const expectedTrackCount = Number(playlistDescription.match(/(\d+)\s+items/i)?.[1] || 0);
+
+  if (!playlistTitle) {
+    throw new Error("Spotify playlist not found");
+  }
+
+  const trackUrlMatches = [
+    ...html.matchAll(/music:song"\s+content="([^"]+)"/gi),
+  ];
+
+  const trackUrls = [...new Set(trackUrlMatches.map((match) => match[1]).filter(Boolean))];
+  if (!trackUrls.length) {
+    throw new Error("No songs were found in that Spotify playlist");
+  }
+
+  if (expectedTrackCount > 0 && trackUrls.length < expectedTrackCount) {
+    throw new Error(
+      "Spotify import needs server-side Spotify credentials to import every song from this playlist"
+    );
+  }
+
+  const spotifyTracks = [];
+  for (const trackUrl of trackUrls) {
+    try {
+      const track = await scrapeSpotifyTrackDetails(trackUrl);
+      if (track) {
+        spotifyTracks.push(track);
+      }
+    } catch (error) {
+      console.warn(`[Spotify Import] Failed to scrape ${trackUrl}: ${error.message}`);
+    }
+  }
+
+  const songs = [];
+  for (const track of spotifyTracks) {
+    try {
+      const matchedSong = await searchYouTubeTrack(track);
+      if (matchedSong) {
+        songs.push(matchedSong);
+      }
+    } catch (error) {
+      console.warn(`[Spotify Import] Failed to match "${track.name}": ${error.message}`);
+    }
+  }
+
+  if (!songs.length) {
+    throw new Error("No playable songs were found in that Spotify playlist");
+  }
+
+  return { playlistTitle, songs };
 };
 
 const searchYouTubeTrack = async (track) => {
@@ -270,6 +368,10 @@ const fetchSpotifyPlaylistSongs = async (playlistUrl) => {
 
   if (!playlistId) {
     throw new Error("Invalid Spotify playlist URL");
+  }
+
+  if (!process.env.SPOTIFY_CLIENT_ID || !process.env.SPOTIFY_CLIENT_SECRET) {
+    return scrapeSpotifyPlaylistSongs(playlistUrl);
   }
 
   const accessToken = await getSpotifyAccessToken();
@@ -364,7 +466,7 @@ const createPlaylist = async (req, res) => {
   try {
     const { name, importUrl } = req.body;
 
-    if (!name && !importUrl) {
+    if (!name?.trim() && !importUrl?.trim()) {
       return res.status(400).json({ message: "Playlist name is required" });
     }
 
@@ -388,6 +490,7 @@ const createPlaylist = async (req, res) => {
     res.status(201).json({
       message: "Playlist created successfully",
       playlist,
+      importedCount: importedSongs.length,
     });
   } catch (error) {
     res.status(500).json({ message: error.message });

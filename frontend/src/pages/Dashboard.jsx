@@ -1132,7 +1132,7 @@ function AddSongsModal({ playlist, onUpdate, onClose }) {
 
 // ─── CreatePlaylistModal ────────────────────────────────
 function CreatePlaylistModal({ onClose, onCreate }) {
-  const [name, setName] = useState("My Playlist #1");
+  const [name, setName] = useState("");
   const [spotifyUrl, setSpotifyUrl] = useState("");
   const [loading, setLoading] = useState(false);
 
@@ -1140,8 +1140,12 @@ function CreatePlaylistModal({ onClose, onCreate }) {
     e.preventDefault();
     if (!name.trim() && !spotifyUrl.trim()) return;
     setLoading(true);
-    await onCreate(name.trim(), spotifyUrl.trim());
-    onClose();
+    try {
+      await onCreate(name.trim(), spotifyUrl.trim());
+      onClose();
+    } finally {
+      setLoading(false);
+    }
   };
 
   return (
@@ -1172,7 +1176,7 @@ function CreatePlaylistModal({ onClose, onCreate }) {
               type="text"
               value={name}
               onChange={(e) => setName(e.target.value)}
-              placeholder="My Playlist #1"
+              placeholder="Leave blank to use Spotify playlist name"
               className="w-full bg-[#3a3a3a] text-white rounded-md px-4 py-3 text-sm font-semibold outline-none focus:ring-2 focus:ring-white/30"
             />
           </div>
@@ -1258,6 +1262,7 @@ export default function Dashboard() {
       showToast(successMessage, "success");
     } catch (error) {
       showToast(error.message || "Failed to create playlist", "error");
+      throw error;
     }
   };
 
