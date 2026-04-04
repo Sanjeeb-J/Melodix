@@ -150,16 +150,18 @@ const fetchImportedSongs = async (importUrl) => {
 const createPlaylist = async (req, res) => {
   try {
     const { name, importUrl } = req.body;
+    const trimmedName = typeof name === "string" ? name.trim() : "";
+    const trimmedImportUrl = typeof importUrl === "string" ? importUrl.trim() : "";
 
-    if (!name?.trim() && !importUrl?.trim()) {
+    if (!trimmedName && !trimmedImportUrl) {
       return res.status(400).json({ message: "Playlist name is required" });
     }
 
     let importedSongs = [];
-    let resolvedName = name?.trim();
+    let resolvedName = trimmedName;
 
-    if (importUrl) {
-      const imported = await fetchImportedSongs(importUrl);
+    if (trimmedImportUrl) {
+      const imported = await fetchImportedSongs(trimmedImportUrl);
       importedSongs = imported.songs;
       if (!resolvedName) {
         resolvedName = imported.playlistTitle;
