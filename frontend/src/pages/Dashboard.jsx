@@ -32,7 +32,6 @@ import {
   Volume2,
   Volume1,
   VolumeX,
-  Heart,
   MoreHorizontal,
   Trash2,
   Edit2,
@@ -171,15 +170,12 @@ function PlayerBar() {
                 <p className="text-sm font-semibold text-white truncate hover:underline cursor-pointer">
                   {currentSong.name || currentSong.title}
                 </p>
-                <p className="text-xs text-sp-dim truncate hover:text-white hover:underline cursor-pointer">
-                  {currentSong.artist}
-                </p>
-              </div>
-              <button className="text-sp-dim hover:text-sp-green transition-colors flex-shrink-0 ml-2">
-                <Heart size={16} />
-              </button>
-            </>
-          ) : (
+              <p className="text-xs text-sp-dim truncate hover:text-white hover:underline cursor-pointer">
+                {currentSong.artist}
+              </p>
+            </div>
+          </>
+        ) : (
             <div className="text-sp-muted text-xs">No song playing</div>
           )}
         </div>
