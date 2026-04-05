@@ -69,6 +69,69 @@ html, body, #root {
 
 .animate-in { animation: fade-in 0.25s ease forwards; }
 
+.queue-sheet {
+  left: max(0.5rem, env(safe-area-inset-left, 0px));
+  right: max(0.5rem, env(safe-area-inset-right, 0px));
+  width: auto;
+  max-height: min(46vh, 330px);
+  border-radius: 1rem 1rem 0.75rem 0.75rem;
+}
+
+.queue-sheet-list {
+  max-height: min(28vh, 190px);
+}
+
+@media (max-width: 379px) {
+  .queue-sheet {
+    left: max(0.35rem, env(safe-area-inset-left, 0px));
+    right: max(0.35rem, env(safe-area-inset-right, 0px));
+    max-height: min(44vh, 300px);
+    border-radius: 0.9rem 0.9rem 0.7rem 0.7rem;
+  }
+
+  .queue-sheet-list {
+    max-height: min(24vh, 160px);
+  }
+}
+
+@media (min-width: 380px) and (max-width: 479px) {
+  .queue-sheet {
+    max-height: min(48vh, 360px);
+  }
+
+  .queue-sheet-list {
+    max-height: min(29vh, 210px);
+  }
+}
+
+@media (min-width: 480px) {
+  .queue-sheet {
+    left: auto;
+    width: min(22rem, calc(100vw - 1rem - env(safe-area-inset-right, 0px)));
+    right: max(0.5rem, env(safe-area-inset-right, 0px));
+    max-height: min(52vh, 400px);
+    border-radius: 1rem;
+  }
+
+  .queue-sheet-list {
+    max-height: min(34vh, 250px);
+  }
+}
+
+@media (min-width: 768px) {
+  .queue-sheet {
+    left: auto;
+    right: max(0.75rem, env(safe-area-inset-right, 0px));
+    width: 340px;
+    max-height: min(70vh, 560px);
+    border-radius: 0.75rem;
+  }
+
+  .queue-sheet-list {
+    max-height: 360px;
+  }
+}
+
 /* Redundant auth-bg styles removed */
 
 .glass-morphism {

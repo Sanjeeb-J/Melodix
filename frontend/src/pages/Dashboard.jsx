@@ -87,12 +87,9 @@ function PlayerBar() {
     <>
       {isQueueOpen && (
         <div
-          className="fixed z-50 overflow-hidden border border-[rgba(88,255,162,0.16)] bg-[#0f1814] shadow-2xl md:w-[340px] md:max-h-[min(70vh,560px)] md:right-4 md:rounded-xl animate-in"
+          className="queue-sheet fixed z-50 overflow-hidden border border-[rgba(88,255,162,0.16)] bg-[#0f1814] shadow-2xl animate-in"
           style={{
             bottom: "calc(var(--player-total-height) + 12px)",
-            left: "auto",
-            right: "max(0.75rem, env(safe-area-inset-right, 0px))",
-            maxHeight: "min(55vh, 420px)",
             boxShadow: "0 18px 50px rgba(0, 0, 0, 0.45), 0 0 0 1px rgba(29,185,84,0.08), 0 0 36px rgba(29,185,84,0.14)",
             backgroundImage:
               "linear-gradient(180deg, rgba(29,185,84,0.09) 0%, rgba(15,24,20,0.96) 26%, rgba(15,18,17,0.98) 100%)",
@@ -100,7 +97,7 @@ function PlayerBar() {
             animation: "queue-pop 0.24s cubic-bezier(0.16, 1, 0.3, 1)",
           }}
         >
-          <div className="flex items-center justify-between px-4 py-3 border-b border-[rgba(88,255,162,0.12)]">
+          <div className="flex items-center justify-between px-3 py-3 sm:px-4 border-b border-[rgba(88,255,162,0.12)]">
             <div>
               <p className="text-sm font-black text-white tracking-wide">Queue</p>
               <p className="text-xs text-[rgba(210,255,227,0.72)]">
@@ -116,17 +113,17 @@ function PlayerBar() {
             </button>
           </div>
 
-          <div className="p-4 border-b border-[rgba(88,255,162,0.1)]">
+          <div className="px-3 py-4 sm:px-4 border-b border-[rgba(88,255,162,0.1)]">
             <p className="text-xs font-bold uppercase tracking-wider text-[rgba(164,255,198,0.8)] mb-3">Now playing</p>
             {currentSong ? (
               <div className="flex items-center gap-3">
                 <img
                   src={currentSong.thumbnail}
                   alt={currentSong.name || currentSong.title}
-                  className="w-12 h-12 rounded object-cover flex-shrink-0"
+                  className="w-11 h-11 sm:w-12 sm:h-12 rounded object-cover flex-shrink-0"
                 />
                 <div className="min-w-0">
-                  <p className="text-sm font-semibold text-white truncate">
+                  <p className="text-[13px] sm:text-sm font-semibold text-white truncate">
                     {currentSong.name || currentSong.title}
                   </p>
                   <p className="text-xs text-sp-dim truncate">{currentSong.artist}</p>
@@ -137,19 +134,19 @@ function PlayerBar() {
             )}
           </div>
 
-          <div className="p-4 overflow-y-auto max-h-[360px]">
+          <div className="queue-sheet-list px-3 py-4 sm:px-4 overflow-y-auto">
             <p className="text-xs font-bold uppercase tracking-wider text-[rgba(164,255,198,0.8)] mb-3">Next up</p>
             {upcomingQueue.length ? (
-              <div className="space-y-3">
+              <div className="space-y-2.5 sm:space-y-3">
                 {upcomingQueue.map((song, index) => (
-                  <div key={`${song.youtubeId || song.videoId || song.name}-${index}`} className="flex items-center gap-3">
+                  <div key={`${song.youtubeId || song.videoId || song.name}-${index}`} className="flex items-center gap-2.5 sm:gap-3">
                     <img
                       src={song.thumbnail}
                       alt={song.name || song.title}
-                      className="w-11 h-11 rounded object-cover flex-shrink-0"
+                      className="w-10 h-10 sm:w-11 sm:h-11 rounded object-cover flex-shrink-0"
                     />
                     <div className="min-w-0">
-                      <p className="text-sm font-semibold text-white truncate">
+                      <p className="text-[13px] sm:text-sm font-semibold text-white truncate">
                         {song.name || song.title}
                       </p>
                       <p className="text-xs text-sp-dim truncate">
