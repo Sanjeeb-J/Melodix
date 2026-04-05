@@ -56,6 +56,17 @@ html, body, #root {
   to { opacity: 1; transform: translateY(0); }
 }
 
+@keyframes queue-pop {
+  from {
+    opacity: 0;
+    transform: translateY(18px) scale(0.98);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
 .animate-in { animation: fade-in 0.25s ease forwards; }
 
 /* Redundant auth-bg styles removed */
