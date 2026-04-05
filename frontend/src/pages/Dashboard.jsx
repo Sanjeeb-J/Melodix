@@ -87,18 +87,22 @@ function PlayerBar() {
     <>
       {isQueueOpen && (
         <div
-          className="fixed z-50 overflow-hidden border border-[rgba(255,255,255,0.08)] bg-[#121212] shadow-2xl md:w-[340px] md:max-h-[min(70vh,560px)] md:right-4 md:rounded-xl"
+          className="fixed z-50 overflow-hidden border border-[rgba(88,255,162,0.16)] bg-[#0f1814] shadow-2xl md:w-[340px] md:max-h-[min(70vh,560px)] md:right-4 md:rounded-xl"
           style={{
             bottom: "calc(var(--player-total-height) + 12px)",
             left: "max(0.75rem, env(safe-area-inset-left, 0px))",
             right: "max(0.75rem, env(safe-area-inset-right, 0px))",
             maxHeight: "min(55vh, 420px)",
+            boxShadow: "0 18px 50px rgba(0, 0, 0, 0.45), 0 0 0 1px rgba(29,185,84,0.08), 0 0 36px rgba(29,185,84,0.14)",
+            backgroundImage:
+              "linear-gradient(180deg, rgba(29,185,84,0.09) 0%, rgba(15,24,20,0.96) 26%, rgba(15,18,17,0.98) 100%)",
+            backdropFilter: "blur(20px)",
           }}
         >
-          <div className="flex items-center justify-between px-4 py-3 border-b border-[rgba(255,255,255,0.06)]">
+          <div className="flex items-center justify-between px-4 py-3 border-b border-[rgba(88,255,162,0.12)]">
             <div>
-              <p className="text-sm font-black text-white">Queue</p>
-              <p className="text-xs text-sp-dim">
+              <p className="text-sm font-black text-white tracking-wide">Queue</p>
+              <p className="text-xs text-[rgba(210,255,227,0.72)]">
                 {upcomingQueue.length ? `${upcomingQueue.length} songs coming up` : "No more songs queued"}
               </p>
             </div>
@@ -111,8 +115,8 @@ function PlayerBar() {
             </button>
           </div>
 
-          <div className="p-4 border-b border-[rgba(255,255,255,0.06)]">
-            <p className="text-xs font-bold uppercase tracking-wider text-sp-dim mb-3">Now playing</p>
+          <div className="p-4 border-b border-[rgba(88,255,162,0.1)]">
+            <p className="text-xs font-bold uppercase tracking-wider text-[rgba(164,255,198,0.8)] mb-3">Now playing</p>
             {currentSong ? (
               <div className="flex items-center gap-3">
                 <img
@@ -133,7 +137,7 @@ function PlayerBar() {
           </div>
 
           <div className="p-4 overflow-y-auto max-h-[360px]">
-            <p className="text-xs font-bold uppercase tracking-wider text-sp-dim mb-3">Next up</p>
+            <p className="text-xs font-bold uppercase tracking-wider text-[rgba(164,255,198,0.8)] mb-3">Next up</p>
             {upcomingQueue.length ? (
               <div className="space-y-3">
                 {upcomingQueue.map((song, index) => (

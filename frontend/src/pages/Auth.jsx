@@ -25,15 +25,29 @@ function Auth() {
     const previousHtmlOverflow = document.documentElement.style.overflow;
     const previousBodyOverflow = document.body.style.overflow;
     const previousBodyMinHeight = document.body.style.minHeight;
+    const root = document.getElementById("root");
+    const previousRootOverflow = root?.style.overflow || "";
+    const previousRootHeight = root?.style.height || "";
+    const previousRootMinHeight = root?.style.minHeight || "";
 
     document.documentElement.style.overflow = "auto";
     document.body.style.overflow = "auto";
     document.body.style.minHeight = "100dvh";
+    if (root) {
+      root.style.overflow = "auto";
+      root.style.height = "auto";
+      root.style.minHeight = "100dvh";
+    }
 
     return () => {
       document.documentElement.style.overflow = previousHtmlOverflow;
       document.body.style.overflow = previousBodyOverflow;
       document.body.style.minHeight = previousBodyMinHeight;
+      if (root) {
+        root.style.overflow = previousRootOverflow;
+        root.style.height = previousRootHeight;
+        root.style.minHeight = previousRootMinHeight;
+      }
     };
   }, []);
 
@@ -98,7 +112,7 @@ function Auth() {
 
     return (
       <div 
-      className="relative min-h-[100dvh] overflow-y-auto text-white bg-cover bg-center px-4 py-6 pb-[max(1.5rem,env(safe-area-inset-bottom))] md:py-10"
+      className="relative min-h-[100dvh] overflow-y-auto text-white bg-cover bg-center px-4 py-6 pb-[max(5rem,env(safe-area-inset-bottom))] md:py-10"
       style={{ backgroundImage: `url(${authBg})` }}
     >
       {/* Enhanced Background Overlays */}
@@ -106,10 +120,10 @@ function Auth() {
       <div className="absolute inset-0 bg-[radial-gradient(circle_at_center,transparent_0%,rgba(0,0,0,0.85)_100%)] z-0" />
       
       {/* Layout Content Wrapper */}
-      <div className="relative z-10 flex min-h-[calc(100dvh-3rem)] md:min-h-[calc(100dvh-5rem)] flex-col justify-center md:flex-row md:items-center w-full max-w-5xl gap-10 md:gap-12 lg:gap-20 py-6 md:py-0 mx-auto">
+      <div className="relative z-10 flex min-h-[calc(100dvh-3rem)] md:min-h-[calc(100dvh-5rem)] flex-col justify-start md:justify-center md:flex-row md:items-center w-full max-w-5xl gap-8 md:gap-12 lg:gap-20 py-4 md:py-0 mx-auto">
         
         {/* Left Side: Branding & Quote */}
-        <div className="w-full md:w-[45%] flex flex-col justify-center animate-in">
+        <div className="w-full md:w-[45%] flex flex-col justify-center animate-in pt-2">
           <div className="max-w-md mx-auto md:mx-0">
             <div className="flex items-center gap-4 mb-8 justify-center md:justify-start">
                <div className="w-16 h-16 rounded-2xl bg-sp-green/10 flex items-center justify-center border border-sp-green/20">
@@ -145,8 +159,8 @@ function Auth() {
         </div>
 
         {/* Right Side: Auth Form Container */}
-        <div className="w-full md:w-[55%] flex items-center justify-center">
-          <div className="w-full max-w-md glass-morphism p-8 md:p-12 rounded-[2.5rem] relative overflow-hidden animate-in">
+        <div className="w-full md:w-[55%] flex items-start md:items-center justify-center">
+          <div className="w-full max-w-md glass-morphism p-6 md:p-12 rounded-[2rem] md:rounded-[2.5rem] relative overflow-hidden animate-in">
             
             <div className="mb-8">
               <h3 className="text-2xl font-bold mb-2">
