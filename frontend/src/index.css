@@ -17,6 +17,8 @@
   --sp-green-hover: #1ed760;
   --sp-player-bg: #181818;
   --player-height: 90px;
+  --player-safe-bottom: env(safe-area-inset-bottom, 0px);
+  --player-total-height: calc(var(--player-height) + var(--player-safe-bottom));
 }
 
 * {
@@ -28,11 +30,18 @@
 html, body, #root {
   width: 100%;
   height: 100%;
+  min-height: 100dvh;
   font-family: "Inter", -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif;
   background-color: var(--sp-black);
   color: var(--sp-text);
   -webkit-font-smoothing: antialiased;
   overflow: hidden;
+}
+
+@media (max-width: 767px) {
+  :root {
+    --player-height: 104px;
+  }
 }
 
 /* Scrollbar */

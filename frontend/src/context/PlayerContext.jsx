@@ -447,6 +447,9 @@ export const PlayerProvider = ({ children }) => {
               setLoadingMessage("");
               setIsPlaying(false);
               console.error("[Player] YouTube playback error");
+              if (playbackIndexRef.current < playbackOrderRef.current.length - 1) {
+                window.setTimeout(() => nextSongRef.current?.(), 250);
+              }
             },
           },
         });
@@ -506,6 +509,71 @@ export const PlayerProvider = ({ children }) => {
     player.unMute?.();
     player.setVolume?.(Math.round(volume * 100));
   }, [volume, isMuted]);
+
+  useEffect(() => {
+    if (!("mediaSession" in navigator)) return;
+
+    if (!currentSong) {
+      navigator.mediaSession.metadata = null;
+      return;
+    }
+
+    navigator.mediaSession.metadata = new MediaMetadata({
+      title: currentSong.name || currentSong.title || "Melodix",
+      artist: currentSong.artist || "Unknown artist",
+      album: currentSong.album || "Melodix",
+      artwork: currentSong.thumbnail
+        ? [
+            { src: currentSong.thumbnail, sizes: "96x96", type: "image/png" },
+            { src: currentSong.thumbnail, sizes: "128x128", type: "image/png" },
+            { src: currentSong.thumbnail, sizes: "192x192", type: "image/png" },
+            { src: currentSong.thumbnail, sizes: "256x256", type: "image/png" },
+            { src: currentSong.thumbnail, sizes: "512x512", type: "image/png" },
+          ]
+        : [],
+    });
+
+    navigator.mediaSession.setActionHandler("play", () => {
+      playerRef.current?.playVideo?.();
+    });
+    navigator.mediaSession.setActionHandler("pause", () => {
+      playerRef.current?.pauseVideo?.();
+    });
+    navigator.mediaSession.setActionHandler("previoustrack", () => {
+      prevSong();
+    });
+    navigator.mediaSession.setActionHandler("nexttrack", () => {
+      nextSong();
+    });
+    navigator.mediaSession.setActionHandler("seekbackward", () => {
+      const player = playerRef.current;
+      if (!player?.seekTo) return;
+      player.seekTo(Math.max(0, currentTime - 10), true);
+    });
+    navigator.mediaSession.setActionHandler("seekforward", () => {
+      const player = playerRef.current;
+      if (!player?.seekTo) return;
+      player.seekTo(Math.min(duration, currentTime + 10), true);
+    });
+  }, [currentSong, currentTime, duration, nextSong, prevSong]);
+
+  useEffect(() => {
+    if (!("mediaSession" in navigator)) return;
+
+    navigator.mediaSession.playbackState = isPlaying ? "playing" : "paused";
+
+    if ("setPositionState" in navigator.mediaSession && duration > 0) {
+      try {
+        navigator.mediaSession.setPositionState({
+          duration,
+          playbackRate: 1,
+          position: Math.min(currentTime, duration),
+        });
+      } catch {
+        // Ignore platforms that reject position updates for iframe-backed playback.
+      }
+    }
+  }, [isPlaying, currentTime, duration]);
 
   return (
     <PlayerContext.Provider

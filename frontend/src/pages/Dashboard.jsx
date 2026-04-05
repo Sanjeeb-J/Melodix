@@ -86,7 +86,15 @@ function PlayerBar() {
   return (
     <>
       {isQueueOpen && (
-        <div className="hidden md:block fixed bottom-[calc(var(--player-height)+12px)] right-4 z-50 w-[340px] max-h-[min(70vh,560px)] rounded-xl border border-[rgba(255,255,255,0.08)] bg-[#121212] shadow-2xl overflow-hidden">
+        <div
+          className="fixed z-50 overflow-hidden border border-[rgba(255,255,255,0.08)] bg-[#121212] shadow-2xl md:w-[340px] md:max-h-[min(70vh,560px)] md:right-4 md:rounded-xl"
+          style={{
+            bottom: "calc(var(--player-total-height) + 12px)",
+            left: "max(0.75rem, env(safe-area-inset-left, 0px))",
+            right: "max(0.75rem, env(safe-area-inset-right, 0px))",
+            maxHeight: "min(55vh, 420px)",
+          }}
+        >
           <div className="flex items-center justify-between px-4 py-3 border-b border-[rgba(255,255,255,0.06)]">
             <div>
               <p className="text-sm font-black text-white">Queue</p>
@@ -154,41 +162,45 @@ function PlayerBar() {
       )}
 
       <footer
-        className="relative w-full z-40 flex items-center justify-between px-4 border-t border-[rgba(255,255,255,0.06)] flex-shrink-0"
-        style={{ height: "var(--player-height)", background: "#181818" }}
+        className="relative w-full z-40 flex items-center justify-between gap-2 px-2 md:px-4 border-t border-[rgba(255,255,255,0.06)] flex-shrink-0"
+        style={{
+          minHeight: "var(--player-total-height)",
+          paddingBottom: "var(--player-safe-bottom)",
+          background: "#181818",
+        }}
       >
         {/* Left: song info (hidden on mobile) */}
-        <div className="flex min-w-10 md:flex items-center gap-3 w-[30%] min-w-0 text-left">
+        <div className="flex min-w-0 items-center gap-2 md:gap-3 w-[34%] md:w-[30%] text-left">
           {currentSong ? (
             <>
               <img
                 src={currentSong.thumbnail}
                 alt={currentSong.name || currentSong.title}
-                className="w-14 h-14 rounded object-cover flex-shrink-0"
+                className="w-10 h-10 md:w-14 md:h-14 rounded object-cover flex-shrink-0"
               />
               <div className="min-w-0">
-                <p className="text-sm font-semibold text-white truncate hover:underline cursor-pointer">
+                <p className="text-xs md:text-sm font-semibold text-white truncate hover:underline cursor-pointer">
                   {currentSong.name || currentSong.title}
                 </p>
-              <p className="text-xs text-sp-dim truncate hover:text-white hover:underline cursor-pointer">
-                {currentSong.artist}
-              </p>
-            </div>
-          </>
-        ) : (
-            <div className="text-sp-muted text-xs">No song playing</div>
+                <p className="text-[11px] md:text-xs text-sp-dim truncate hover:text-white hover:underline cursor-pointer">
+                  {currentSong.artist}
+                </p>
+              </div>
+            </>
+          ) : (
+            <div className="text-sp-muted text-[11px] md:text-xs">No song playing</div>
           )}
         </div>
 
         {/* Center: controls */}
-        <div className="flex flex-col items-center gap-2 w-full md:w-[40%]">
-          <div className="flex items-center gap-3 md:gap-5">
+        <div className="flex flex-col items-center gap-2 w-[46%] md:w-[40%] min-w-0">
+          <div className="flex items-center gap-2 md:gap-5">
             <button
               onClick={toggleShuffle}
               className={`transition-colors ${isShuffle ? "text-sp-green" : "text-sp-dim hover:text-white"}`}
               title="Toggle Shuffle (S)"
             >
-              <Shuffle size={16} />
+              <Shuffle size={15} />
             </button>
 
             <button
@@ -196,13 +208,13 @@ function PlayerBar() {
               className="text-sp-dim hover:text-white transition-colors"
               title="Previous (Shift+Left)"
             >
-              <SkipBack size={20} fill="currentColor" />
+              <SkipBack size={18} fill="currentColor" />
             </button>
 
             <button
               onClick={togglePlay}
               disabled={!currentSong}
-              className="w-8 h-8 md:w-10 md:h-10 bg-white rounded-full flex items-center justify-center hover:scale-105 transition-transform disabled:opacity-40"
+              className="w-9 h-9 md:w-10 md:h-10 bg-white rounded-full flex items-center justify-center hover:scale-105 transition-transform disabled:opacity-40"
               title="Play/Pause (Space)"
             >
               {isLoading ? (
@@ -219,7 +231,7 @@ function PlayerBar() {
               className="text-sp-dim hover:text-white transition-colors"
               title="Next (Shift+Right)"
             >
-              <SkipForward size={20} fill="currentColor" />
+              <SkipForward size={18} fill="currentColor" />
             </button>
 
             <button
@@ -227,7 +239,7 @@ function PlayerBar() {
               className={`transition-colors ${repeatMode !== "none" ? "text-sp-green" : "text-sp-dim hover:text-white"}`}
               title="Toggle Repeat (L)"
             >
-              <RepeatIcon size={16} />
+              <RepeatIcon size={15} />
             </button>
           </div>
 
@@ -257,7 +269,7 @@ function PlayerBar() {
         </div>
 
         {/* Right: queue + volume (hidden on mobile) */}
-        <div className="hidden md:flex items-center gap-2 w-[30%] justify-end">
+        <div className="flex items-center gap-2 w-[20%] md:w-[30%] justify-end">
           <button
             onClick={() => setIsQueueOpen((value) => !value)}
             className={`transition-colors ${isQueueOpen ? "text-white" : "text-sp-dim hover:text-white"}`}
@@ -267,7 +279,7 @@ function PlayerBar() {
           </button>
           <button
             onClick={toggleMute}
-            className="text-sp-dim hover:text-white transition-colors"
+            className="hidden md:inline-flex text-sp-dim hover:text-white transition-colors"
             title="Mute (M)"
           >
             <VolumeIcon size={18} />
@@ -279,7 +291,7 @@ function PlayerBar() {
             step={0.01}
             value={isMuted ? 0 : volume}
             onChange={(e) => setVolume(parseFloat(e.target.value))}
-            className="w-24 h-1"
+            className="hidden md:block w-24 h-1"
             style={{
               background: `linear-gradient(to right, #1db954 ${(isMuted ? 0 : volume) * 100}%, rgba(255,255,255,0.1) ${(isMuted ? 0 : volume) * 100}%)`,
             }}
@@ -1377,7 +1389,7 @@ export default function Dashboard() {
 
   if (loading) {
     return (
-      <div className="h-screen bg-sp-black flex items-center justify-center">
+      <div className="h-[100dvh] bg-sp-black flex items-center justify-center">
         <div className="w-12 h-12 border-3 border-sp-green border-t-transparent rounded-full animate-spin" />
       </div>
     );
@@ -1389,7 +1401,7 @@ export default function Dashboard() {
     : null;
 
   return (
-    <div className="h-screen flex flex-col overflow-hidden bg-sp-black">
+    <div className="h-[100dvh] min-h-[100dvh] flex flex-col overflow-hidden bg-sp-black">
       {/* Main layout (sidebar + content) */}
       <div className="flex flex-1 overflow-hidden relative">
         {/* Sidebar */}

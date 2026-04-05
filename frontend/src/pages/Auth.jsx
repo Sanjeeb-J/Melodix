@@ -21,6 +21,22 @@ function Auth() {
     }
   }, [token, navigate]);
 
+  useEffect(() => {
+    const previousHtmlOverflow = document.documentElement.style.overflow;
+    const previousBodyOverflow = document.body.style.overflow;
+    const previousBodyMinHeight = document.body.style.minHeight;
+
+    document.documentElement.style.overflow = "auto";
+    document.body.style.overflow = "auto";
+    document.body.style.minHeight = "100dvh";
+
+    return () => {
+      document.documentElement.style.overflow = previousHtmlOverflow;
+      document.body.style.overflow = previousBodyOverflow;
+      document.body.style.minHeight = previousBodyMinHeight;
+    };
+  }, []);
+
   const [loginData, setLoginData] = useState({ email: "", password: "" });
   const [registerData, setRegisterData] = useState({ name: "", email: "", password: "" });
   const [forgotData, setForgotData] = useState({ email: "", password: "" });
@@ -82,7 +98,7 @@ function Auth() {
 
     return (
       <div 
-      className="relative min-h-screen overflow-y-auto text-white bg-cover bg-center px-4 py-6 md:py-10"
+      className="relative min-h-[100dvh] overflow-y-auto text-white bg-cover bg-center px-4 py-6 pb-[max(1.5rem,env(safe-area-inset-bottom))] md:py-10"
       style={{ backgroundImage: `url(${authBg})` }}
     >
       {/* Enhanced Background Overlays */}
@@ -90,7 +106,7 @@ function Auth() {
       <div className="absolute inset-0 bg-[radial-gradient(circle_at_center,transparent_0%,rgba(0,0,0,0.85)_100%)] z-0" />
       
       {/* Layout Content Wrapper */}
-      <div className="relative z-10 flex min-h-[calc(100vh-3rem)] md:min-h-[calc(100vh-5rem)] flex-col justify-center md:flex-row md:items-center w-full max-w-5xl gap-10 md:gap-12 lg:gap-20 py-6 md:py-0 mx-auto">
+      <div className="relative z-10 flex min-h-[calc(100dvh-3rem)] md:min-h-[calc(100dvh-5rem)] flex-col justify-center md:flex-row md:items-center w-full max-w-5xl gap-10 md:gap-12 lg:gap-20 py-6 md:py-0 mx-auto">
         
         {/* Left Side: Branding & Quote */}
         <div className="w-full md:w-[45%] flex flex-col justify-center animate-in">
