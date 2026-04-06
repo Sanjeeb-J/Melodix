@@ -1,7 +1,52 @@
+// ─── Playlist Service ──────────────────────────────────────────────────────────
+// Includes localStorage caching for getPlaylists (5-minute TTL).
+// All mutation functions (create, add, delete, update) invalidate the cache
+// so the next fetch always returns fresh data.
+
 const API_URL = `${import.meta.env.VITE_API_URL}/api/playlists`;
+
+const CACHE_KEY = "melodix_playlists_cache";
+const CACHE_TTL_MS = 5 * 60 * 1000; // 5 minutes
+
+// ─── Cache helpers ────────────────────────────────────────────────────────────
+
+const getCachedPlaylists = () => {
+  try {
+    const raw = localStorage.getItem(CACHE_KEY);
+    if (!raw) return null;
+    const { data, timestamp } = JSON.parse(raw);
+    if (Date.now() - timestamp > CACHE_TTL_MS) {
+      localStorage.removeItem(CACHE_KEY);
+      return null;
+    }
+    return data;
+  } catch {
+    return null;
+  }
+};
+
+const setCachedPlaylists = (data) => {
+  try {
+    localStorage.setItem(CACHE_KEY, JSON.stringify({ data, timestamp: Date.now() }));
+  } catch {
+    // localStorage might be full — fail silently
+  }
+};
+
+const invalidatePlaylistCache = () => {
+  localStorage.removeItem(CACHE_KEY);
+};
+
+// ─── API functions ────────────────────────────────────────────────────────────
 
 export const getPlaylists = async () => {
   const token = localStorage.getItem("token");
+
+  // ✅ Serve from cache if fresh
+  const cached = getCachedPlaylists();
+  if (cached) {
+    return cached;
+  }
 
   let res;
   try {
@@ -21,11 +66,18 @@ export const getPlaylists = async () => {
     throw err;
   }
 
-  return res.json();
+  const data = await res.json();
+
+  // ✅ Cache the fresh result
+  setCachedPlaylists(data);
+
+  return data;
 };
 
 export const createPlaylist = async (name, importUrl = "") => {
   const token = localStorage.getItem("token");
+
+  invalidatePlaylistCache(); // ✅ Invalidate before mutating
 
   const res = await fetch(API_URL, {
     method: "POST",
@@ -45,6 +97,8 @@ export const createPlaylist = async (name, importUrl = "") => {
 
 export const addSongFromYouTube = async (playlistId, song) => {
   const token = localStorage.getItem("token");
+
+  invalidatePlaylistCache(); // ✅ Invalidate — playlist songs changed
 
   const res = await fetch(`${API_URL}/${playlistId}/songs`, {
     method: "POST",
@@ -66,6 +120,8 @@ export const addSongFromYouTube = async (playlistId, song) => {
 export const deleteSong = async (playlistId, songId) => {
   const token = localStorage.getItem("token");
 
+  invalidatePlaylistCache(); // ✅ Invalidate — song removed
+
   const res = await fetch(`${API_URL}/${playlistId}/songs/${songId}`, {
     method: "DELETE",
     headers: { Authorization: `Bearer ${token}` },
@@ -77,6 +133,8 @@ export const deleteSong = async (playlistId, songId) => {
 
 export const updateSong = async (playlistId, songId, data) => {
   const token = localStorage.getItem("token");
+
+  invalidatePlaylistCache(); // ✅ Invalidate — song metadata changed
 
   const res = await fetch(`${API_URL}/${playlistId}/songs/${songId}`, {
     method: "PUT",
@@ -93,6 +151,8 @@ export const updateSong = async (playlistId, songId, data) => {
 export const updatePlaylist = async (id, name) => {
   const token = localStorage.getItem("token");
 
+  invalidatePlaylistCache(); // ✅ Invalidate — playlist name changed
+
   const res = await fetch(`${API_URL}/${id}`, {
     method: "PUT",
     headers: {
@@ -108,6 +168,8 @@ export const updatePlaylist = async (id, name) => {
 export const deletePlaylist = async (id) => {
   const token = localStorage.getItem("token");
 
+  invalidatePlaylistCache(); // ✅ Invalidate — playlist removed
+
   await fetch(`${API_URL}/${id}`, {
     method: "DELETE",
     headers: { Authorization: `Bearer ${token}` },
@@ -116,6 +178,9 @@ export const deletePlaylist = async (id) => {
 
 export const markPlaylistPlayed = async (id) => {
   const token = localStorage.getItem("token");
+
+  // No cache invalidation needed here — play order is cosmetic
+  // and will refresh on next natural expiry
 
   const res = await fetch(`${API_URL}/${id}/play`, {
     method: "PUT",

@@ -625,14 +625,31 @@ function SearchView({ selectedPlaylist, playlists, onPlaylistSelect, onUpdate })
   const [addingId, setAddingId] = useState(null);
   const { showToast } = useToast();
 
+  // ✅ Client-side cache: avoids duplicate API calls within the same session
+  const searchCache = useRef({});
+
   const handleSearch = async () => {
     if (!query.trim()) return;
+
+    const cacheKey = query.trim().toLowerCase();
+
+    // Serve from in-memory cache if available
+    if (searchCache.current[cacheKey]) {
+      setResults(searchCache.current[cacheKey]);
+      return;
+    }
+
     setLoading(true);
     try {
       const data = await searchYouTube(query);
+      searchCache.current[cacheKey] = data; // ✅ Cache result
       setResults(data);
-    } catch {
-      showToast("Search failed", "error");
+    } catch (err) {
+      if (err?.status === 429 || (err?.message || "").includes("429")) {
+        showToast("Too many searches — please wait a moment", "error");
+      } else {
+        showToast("Search failed", "error");
+      }
     } finally {
       setLoading(false);
     }
@@ -1118,14 +1135,31 @@ function AddSongsModal({ playlist, onUpdate, onClose }) {
   const [addingId, setAddingId] = useState(null);
   const { showToast } = useToast();
 
+  // ✅ Client-side cache: avoids duplicate API calls within the same modal session
+  const searchCache = useRef({});
+
   const handleSearch = async () => {
     if (!query.trim()) return;
+
+    const cacheKey = query.trim().toLowerCase();
+
+    // Serve from in-memory cache if available
+    if (searchCache.current[cacheKey]) {
+      setResults(searchCache.current[cacheKey]);
+      return;
+    }
+
     setLoading(true);
     try {
       const data = await searchYouTube(query);
+      searchCache.current[cacheKey] = data; // ✅ Cache result
       setResults(data);
-    } catch {
-      showToast("Search failed", "error");
+    } catch (err) {
+      if (err?.status === 429 || (err?.message || "").includes("429")) {
+        showToast("Too many searches — please wait a moment", "error");
+      } else {
+        showToast("Search failed", "error");
+      }
     } finally {
       setLoading(false);
     }
@@ -1383,7 +1417,13 @@ export default function Dashboard() {
   const handleMarkPlayed = async (id) => {
     try {
       await markPlaylistPlayed(id);
-      fetchPlaylists(); // Refresh to show latest on top
+      // Optimized: move the played playlist to the top locally — no network refetch
+      setPlaylists((prev) => {
+        const idx = prev.findIndex((p) => p._id === id);
+        if (idx <= 0) return prev;
+        const played = prev[idx];
+        return [played, ...prev.slice(0, idx), ...prev.slice(idx + 1)];
+      });
     } catch (err) {
       console.error("Play update failed", err);
     }

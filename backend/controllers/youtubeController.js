@@ -1,4 +1,5 @@
 const axios = require("axios");
+const { getCached, setCached, getCacheStats } = require("../utils/searchCache");
 
 const formatDuration = (iso) => {
   if (!iso) return "--:--";
@@ -18,7 +19,18 @@ const searchYouTube = async (req, res) => {
       return res.status(400).json({ message: "Search query is required" });
     }
 
-    // 1️⃣ SEARCH API
+    // ─── 1️⃣ Check cache first (saves 101 quota units per cache hit) ──────────
+    const cached = getCached(query);
+    if (cached) {
+      console.log(`[YouTube Cache HIT] "${query}" — served from cache | Cache size: ${getCacheStats().size}`);
+      res.setHeader("X-Cache", "HIT");
+      return res.json(cached);
+    }
+
+    console.log(`[YouTube Cache MISS] "${query}" — calling YouTube API`);
+    res.setHeader("X-Cache", "MISS");
+
+    // ─── 2️⃣ SEARCH API (100 quota units) ─────────────────────────────────────
     const searchResponse = await axios.get(
       "https://www.googleapis.com/youtube/v3/search",
       {
@@ -36,7 +48,7 @@ const searchYouTube = async (req, res) => {
 
     const videoIds = items.map((i) => i.id.videoId).join(",");
 
-    // 2️⃣ VIDEOS API (for duration)
+    // ─── 3️⃣ VIDEOS API (1 quota unit per video, batched) ─────────────────────
     const videoResponse = await axios.get(
       "https://www.googleapis.com/youtube/v3/videos",
       {
@@ -53,19 +65,23 @@ const searchYouTube = async (req, res) => {
       durationMap[v.id] = formatDuration(v.contentDetails.duration);
     });
 
-    // 3️⃣ MERGE RESULT
+    // ─── 4️⃣ MERGE RESULT ─────────────────────────────────────────────────────
     const results = items.map((item) => ({
       title: item.snippet.title,
-      artist: item.snippet.channelTitle, // ✅ FIXED
+      artist: item.snippet.channelTitle,
       thumbnail: item.snippet.thumbnails.medium.url,
       videoId: item.id.videoId,
       youtubeLink: `https://www.youtube.com/watch?v=${item.id.videoId}`,
-      duration: durationMap[item.id.videoId] || "--:--", // ✅ FIXED
+      duration: durationMap[item.id.videoId] || "--:--",
     }));
+
+    // ─── 5️⃣ Save to cache ─────────────────────────────────────────────────────
+    setCached(query, results);
+    console.log(`[YouTube Cache] Cached "${query}" | Cache size now: ${getCacheStats().size}`);
 
     res.json(results);
   } catch (error) {
-    console.error(error);
+    console.error("[YouTube] Search error:", error?.response?.data || error.message);
     res.status(500).json({ message: "YouTube search failed" });
   }
 };

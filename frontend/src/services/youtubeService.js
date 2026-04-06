@@ -10,7 +10,10 @@ export const searchYouTube = async (query) => {
   });
 
   if (!res.ok) {
-    throw new Error("YouTube search failed");
+    // Attach the HTTP status so callers can handle 429 (rate limit) separately
+    const err = new Error(`YouTube search failed (${res.status})`);
+    err.status = res.status;
+    throw err;
   }
 
   return res.json();
