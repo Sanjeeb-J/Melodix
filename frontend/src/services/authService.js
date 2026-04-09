@@ -47,20 +47,3 @@ export const forgotPassword = async (email, newPassword) => {
 
   return data;
 };
-
-export const getCurrentUser = async () => {
-  const token = localStorage.getItem("token");
-  const res = await fetch(`${API_URL}/me`, {
-    headers: {
-      Authorization: `Bearer ${token}`,
-    },
-  });
-
-  const data = await res.json().catch(() => ({}));
-
-  if (!res.ok) {
-    throw new Error(data.message || "Failed to load user");
-  }
-
-  return data;
-};

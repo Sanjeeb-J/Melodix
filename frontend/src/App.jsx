@@ -8,7 +8,7 @@ function App() {
   return (
     <ToastProvider>
       <Routes>
-        <Route path="/" element={<Auth />} />
+        <Route path="/" element={<Auth />} />;
         <Route
           path="/dashboard"
           element={
