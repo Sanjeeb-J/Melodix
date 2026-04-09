@@ -6,6 +6,7 @@ import {
   ChevronRight,
   CirclePlus,
   Heart,
+  Home,
   Library,
   ListMusic,
   Loader2,
