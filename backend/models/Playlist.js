@@ -45,6 +45,19 @@ const playlistSchema = new mongoose.Schema(
       type: mongoose.Schema.Types.ObjectId,
       ref: "User",
     },
+    description: {
+      type: String,
+      default: "",
+      trim: true,
+    },
+    coverImage: {
+      type: String,
+      default: "",
+    },
+    accentColor: {
+      type: String,
+      default: "#1db954",
+    },
     songs: [songSchema],
   },
   {

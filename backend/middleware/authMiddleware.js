@@ -28,7 +28,7 @@ const protect = async (req, res, next) => {
       req.user = await User.findById(decoded.id).select("-password");
     } catch (dbError) {
       console.warn("[Auth] Database error during user lookup — proceeding with token data only.");
-      req.user = { id: decoded.id, name: "Guest User" }; // Minimal user object to support streaming
+      req.user = { id: decoded.id, _id: decoded.id, name: "Guest User" }; // Minimal user object to support streaming
     }
     
     next();

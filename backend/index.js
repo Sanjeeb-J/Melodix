@@ -8,6 +8,7 @@ const testRoutes = require("./routes/testRoutes");
 const playlistRoutes = require("./routes/playlistRoutes");
 const youtubeRoutes = require("./routes/youtubeRoutes");
 const streamRoutes = require("./routes/streamRoutes");
+const libraryRoutes = require("./routes/libraryRoutes");
 
 const app = express();
 
@@ -31,6 +32,7 @@ app.use("/api/test", testRoutes);
 app.use("/api/playlists", playlistRoutes);
 app.use("/api/youtube", youtubeRoutes);
 app.use("/api/stream", streamRoutes);
+app.use("/api/library", libraryRoutes);
 
 // Health check
 app.get("/", (req, res) => {

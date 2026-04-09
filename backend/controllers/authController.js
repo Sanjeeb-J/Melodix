@@ -2,6 +2,15 @@ const User = require("../models/User");
 const bcrypt = require("bcryptjs");
 const jwt = require("jsonwebtoken");
 
+const buildUserPayload = (user) => ({
+  _id: user._id,
+  name: user.name,
+  email: user.email,
+  avatarColor: user.avatarColor,
+  bio: user.bio,
+  favoriteGenres: user.favoriteGenres,
+});
+
 // REGISTER USER
 const registerUser = async (req, res) => {
   try {
@@ -24,6 +33,7 @@ const registerUser = async (req, res) => {
     res.status(201).json({
       message: "User registered successfully",
       userId: user._id,
+      user: buildUserPayload(user),
     });
   } catch (error) {
     res.status(500).json({ message: error.message });
@@ -52,7 +62,22 @@ const loginUser = async (req, res) => {
     res.json({
       message: "Login successful",
       token,
+      user: buildUserPayload(user),
     });
+  } catch (error) {
+    res.status(500).json({ message: error.message });
+  }
+};
+
+const getCurrentUser = async (req, res) => {
+  try {
+    const user = await User.findById(req.user._id).select("-password");
+
+    if (!user) {
+      return res.status(404).json({ message: "User not found" });
+    }
+
+    res.json({ user: buildUserPayload(user) });
   } catch (error) {
     res.status(500).json({ message: error.message });
   }
@@ -77,4 +102,4 @@ const forgotPassword = async (req, res) => {
   }
 };
 
-module.exports = { registerUser, loginUser, forgotPassword };
+module.exports = { registerUser, loginUser, forgotPassword, getCurrentUser };
