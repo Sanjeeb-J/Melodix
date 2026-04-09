@@ -57,6 +57,43 @@ const relDate = (value) => {
 
 const artForPlaylist = (playlist) => playlist?.coverImage || playlist?.songs?.[0]?.thumbnail || FALLBACK_ART;
 
+const collectTracks = (playlists, likedSongs, recentPlays, searchResults, recommendations) => {
+  const merged = [
+    ...likedSongs,
+    ...recentPlays.map((entry) => entry.track),
+    ...searchResults,
+    ...recommendations,
+    ...playlists.flatMap((playlist) => playlist.songs || []),
+  ];
+
+  return merged.filter(
+    (track, index, array) =>
+      track && (track.youtubeId || track.videoId) &&
+      array.findIndex((item) => (item.youtubeId || item.videoId) === (track.youtubeId || track.videoId)) === index
+  );
+};
+
+const buildEntityCards = (tracks, key) => {
+  const groups = new Map();
+
+  tracks.forEach((track) => {
+    const value = (track[key] || (key === "album" ? "Singles & One-Offs" : "Unknown Artist")).trim();
+    if (!groups.has(value)) {
+      groups.set(value, {
+        name: value,
+        image: track.thumbnail || FALLBACK_ART,
+        tracks: [],
+      });
+    }
+    groups.get(value).tracks.push(track);
+  });
+
+  return Array.from(groups.values())
+    .map((entry) => ({ ...entry, count: entry.tracks.length }))
+    .sort((a, b) => b.count - a.count)
+    .slice(0, 8);
+};
+
 function Card({ title, subtitle, image, onClick, action }) {
   return (
     <button onClick={onClick} className="group rounded-[28px] border border-white/8 bg-white/5 p-3 text-left transition hover:-translate-y-1 hover:bg-white/8">
@@ -97,6 +134,110 @@ function Row({ track, index, liked, meta, onPlay, onLike, onAdd }) {
         ) : null}
       </div>
     </div>
+  );
+}
+
+function ModalShell({ title, subtitle, onClose, children }) {
+  return (
+    <div className="fixed inset-0 z-40 flex items-center justify-center bg-black/70 p-4 backdrop-blur-md">
+      <div className="w-full max-w-xl rounded-[32px] border border-white/10 bg-[#101010] p-6 shadow-2xl">
+        <div className="mb-5 flex items-start justify-between gap-4">
+          <div>
+            <h3 className="text-xl font-black text-white">{title}</h3>
+            {subtitle ? <p className="mt-1 text-sm text-white/55">{subtitle}</p> : null}
+          </div>
+          <button onClick={onClose} className="rounded-full border border-white/10 px-3 py-1 text-sm text-white/65 transition hover:text-white">
+            Close
+          </button>
+        </div>
+        {children}
+      </div>
+    </div>
+  );
+}
+
+function PlaylistModal({ initialValue, onClose, onSave, saving }) {
+  const [name, setName] = useState(initialValue?.name || "");
+
+  return (
+    <ModalShell
+      title={initialValue ? "Rename Playlist" : "Create Playlist"}
+      subtitle={initialValue ? "Give your playlist a sharper identity." : "Build a new collection without leaving the app."}
+      onClose={onClose}
+    >
+      <div className="space-y-4">
+        <input
+          autoFocus
+          value={name}
+          onChange={(e) => setName(e.target.value)}
+          placeholder="Late Night Drive"
+          className="w-full rounded-2xl border border-white/10 bg-white/5 px-4 py-3 text-sm text-white outline-none transition focus:border-[#1db954]"
+        />
+        <div className="flex justify-end gap-3">
+          <button onClick={onClose} className="rounded-full px-4 py-2 text-sm font-semibold text-white/70 transition hover:text-white">Cancel</button>
+          <button
+            onClick={() => name.trim() && onSave(name.trim())}
+            disabled={saving || !name.trim()}
+            className="rounded-full bg-[#1db954] px-4 py-2 text-sm font-bold text-black transition hover:bg-[#1ed760] disabled:opacity-50"
+          >
+            {saving ? "Saving..." : initialValue ? "Save" : "Create"}
+          </button>
+        </div>
+      </div>
+    </ModalShell>
+  );
+}
+
+function AddTrackModal({ playlists, track, onClose, onSelect, saving }) {
+  return (
+    <ModalShell
+      title="Add To Playlist"
+      subtitle={`Choose where to save "${track?.name || track?.title}".`}
+      onClose={onClose}
+    >
+      <div className="max-h-[50vh] space-y-2 overflow-y-auto pr-1">
+        {playlists.length ? playlists.map((playlist) => (
+          <button
+            key={playlist._id}
+            onClick={() => onSelect(playlist)}
+            disabled={saving}
+            className="flex w-full items-center gap-3 rounded-2xl border border-white/8 bg-white/5 px-4 py-3 text-left transition hover:bg-white/8 disabled:opacity-50"
+          >
+            <img src={artForPlaylist(playlist)} alt="" className="h-12 w-12 rounded-2xl object-cover" />
+            <div className="min-w-0">
+              <p className="truncate text-sm font-semibold text-white">{playlist.name}</p>
+              <p className="truncate text-xs text-white/55">{playlist.songs?.length || 0} tracks</p>
+            </div>
+          </button>
+        )) : <div className="rounded-2xl border border-dashed border-white/10 px-4 py-8 text-center text-sm text-white/55">Create a playlist first.</div>}
+      </div>
+    </ModalShell>
+  );
+}
+
+function ProfileModal({ initialUser, onClose, onSave, saving }) {
+  const [name, setName] = useState(initialUser?.name || "");
+  const [bio, setBio] = useState(initialUser?.bio || "");
+  const [genres, setGenres] = useState((initialUser?.favoriteGenres || []).join(", "));
+
+  return (
+    <ModalShell title="Edit Profile" subtitle="Update your identity, vibe, and favorite genres." onClose={onClose}>
+      <div className="space-y-4">
+        <input value={name} onChange={(e) => setName(e.target.value)} placeholder="Display name" className="w-full rounded-2xl border border-white/10 bg-white/5 px-4 py-3 text-sm text-white outline-none transition focus:border-[#1db954]" />
+        <textarea value={bio} onChange={(e) => setBio(e.target.value)} rows={4} placeholder="Tell listeners about your taste." className="w-full resize-none rounded-2xl border border-white/10 bg-white/5 px-4 py-3 text-sm text-white outline-none transition focus:border-[#1db954]" />
+        <input value={genres} onChange={(e) => setGenres(e.target.value)} placeholder="indie, pop, electronic" className="w-full rounded-2xl border border-white/10 bg-white/5 px-4 py-3 text-sm text-white outline-none transition focus:border-[#1db954]" />
+        <div className="flex justify-end gap-3">
+          <button onClick={onClose} className="rounded-full px-4 py-2 text-sm font-semibold text-white/70 transition hover:text-white">Cancel</button>
+          <button
+            onClick={() => onSave({ name: name.trim(), bio, favoriteGenres: genres.split(",").map((genre) => genre.trim()).filter(Boolean) })}
+            disabled={saving || !name.trim()}
+            className="rounded-full bg-[#1db954] px-4 py-2 text-sm font-bold text-black transition hover:bg-[#1ed760] disabled:opacity-50"
+          >
+            {saving ? "Saving..." : "Save Profile"}
+          </button>
+        </div>
+      </div>
+    </ModalShell>
   );
 }
 
@@ -164,6 +305,11 @@ export default function Dashboard() {
   const [searchResults, setSearchResults] = useState([]);
   const [loading, setLoading] = useState(true);
   const [isSearching, setIsSearching] = useState(false);
+  const [playlistModal, setPlaylistModal] = useState(null);
+  const [addTrackModal, setAddTrackModal] = useState(null);
+  const [profileModalOpen, setProfileModalOpen] = useState(false);
+  const [entityDetail, setEntityDetail] = useState(null);
+  const [savingState, setSavingState] = useState({ playlist: false, addTrack: false, profile: false });
 
   const likedIds = useMemo(() => new Set(likedSongs.map((track) => track.youtubeId)), [likedSongs]);
   const selectedPlaylist = playlists.find((playlist) => playlist._id === selectedPlaylistId) || null;
@@ -175,6 +321,12 @@ export default function Dashboard() {
   };
   const recommendations = homeFeed?.sections?.recommendations?.length ? homeFeed.sections.recommendations : likedSongs.slice(0, 8);
   const quickAccess = homeFeed?.sections?.quickAccess?.length ? homeFeed.sections.quickAccess : playlists.slice(0, 6);
+  const libraryTracks = useMemo(
+    () => collectTracks(playlists, likedSongs, recentPlays, searchResults, recommendations),
+    [playlists, likedSongs, recentPlays, searchResults, recommendations]
+  );
+  const topArtists = useMemo(() => buildEntityCards(libraryTracks, "artist"), [libraryTracks]);
+  const topAlbums = useMemo(() => buildEntityCards(libraryTracks, "album"), [libraryTracks]);
 
   const loadApp = async () => {
     setLoading(true);
@@ -267,17 +419,23 @@ export default function Dashboard() {
     }
   };
 
-  const promptCreatePlaylist = async () => {
-    const name = window.prompt("Playlist name");
-    if (!name?.trim()) return;
+  const openCreatePlaylist = () => {
+    setPlaylistModal({ mode: "create" });
+  };
+
+  const savePlaylist = async (name) => {
+    setSavingState((current) => ({ ...current, playlist: true }));
     try {
       const response = await createPlaylist(name.trim());
       setPlaylists((current) => [response.playlist, ...current]);
       setSelectedPlaylistId(response.playlist._id);
       setActiveView("playlist");
+      setPlaylistModal(null);
       showToast(`Created "${response.playlist.name}"`, "success");
     } catch (error) {
       showToast(error.message || "Could not create playlist", "error");
+    } finally {
+      setSavingState((current) => ({ ...current, playlist: false }));
     }
   };
 
@@ -286,36 +444,48 @@ export default function Dashboard() {
       showToast("Create a playlist first", "info");
       return;
     }
-    const options = playlists.map((playlist, index) => `${index + 1}. ${playlist.name}`).join("\n");
-    const answer = window.prompt(`Add to which playlist?\n${options}`);
-    const playlist = playlists[Number(answer) - 1];
-    if (!playlist) return;
+    setAddTrackModal(track);
+  };
+
+  const addTrackToSelectedPlaylist = async (playlist) => {
+    if (!addTrackModal) return;
+    setSavingState((current) => ({ ...current, addTrack: true }));
     try {
       const response = await addSongFromYouTube(playlist._id, {
-        name: track.name || track.title,
-        artist: track.artist,
-        album: track.album || "YouTube",
-        duration: track.duration,
-        youtubeId: track.youtubeId || track.videoId,
-        youtubeLink: track.youtubeLink || `https://www.youtube.com/watch?v=${track.youtubeId || track.videoId}`,
-        thumbnail: track.thumbnail,
+        name: addTrackModal.name || addTrackModal.title,
+        artist: addTrackModal.artist,
+        album: addTrackModal.album || "YouTube",
+        duration: addTrackModal.duration,
+        youtubeId: addTrackModal.youtubeId || addTrackModal.videoId,
+        youtubeLink: addTrackModal.youtubeLink || `https://www.youtube.com/watch?v=${addTrackModal.youtubeId || addTrackModal.videoId}`,
+        thumbnail: addTrackModal.thumbnail,
       });
       setPlaylists((current) => current.map((item) => (item._id === response.playlist._id ? response.playlist : item)));
+      setAddTrackModal(null);
       showToast(`Added to ${playlist.name}`, "success");
     } catch (error) {
       showToast(error.message || "Could not add track", "error");
+    } finally {
+      setSavingState((current) => ({ ...current, addTrack: false }));
     }
   };
 
-  const promptRenamePlaylist = async (playlist) => {
-    const nextName = window.prompt("Rename playlist", playlist.name);
-    if (!nextName?.trim() || nextName.trim() === playlist.name) return;
+  const promptRenamePlaylist = (playlist) => {
+    setPlaylistModal({ mode: "rename", playlist });
+  };
+
+  const saveRenamedPlaylist = async (nextName) => {
+    if (!playlistModal?.playlist) return;
+    setSavingState((current) => ({ ...current, playlist: true }));
     try {
-      const response = await updatePlaylist(playlist._id, nextName.trim());
+      const response = await updatePlaylist(playlistModal.playlist._id, nextName.trim());
       setPlaylists((current) => current.map((item) => (item._id === response.playlist._id ? response.playlist : item)));
+      setPlaylistModal(null);
       showToast("Playlist renamed", "success");
     } catch (error) {
       showToast(error.message || "Could not rename playlist", "error");
+    } finally {
+      setSavingState((current) => ({ ...current, playlist: false }));
     }
   };
 
@@ -332,22 +502,27 @@ export default function Dashboard() {
     }
   };
 
-  const editProfile = async () => {
-    const name = window.prompt("Display name", profile?.user?.name || user?.name || "");
+  const editProfile = () => {
+    setProfileModalOpen(true);
+  };
+
+  const saveProfile = async ({ name, bio, favoriteGenres }) => {
     if (!name?.trim()) return;
-    const bio = window.prompt("Short bio", profile?.user?.bio || "") || "";
-    const genres = window.prompt("Favorite genres (comma separated)", (profile?.user?.favoriteGenres || []).join(", ")) || "";
+    setSavingState((current) => ({ ...current, profile: true }));
     try {
       const response = await updateProfile({
         name: name.trim(),
         bio,
-        favoriteGenres: genres.split(",").map((genre) => genre.trim()).filter(Boolean),
+        favoriteGenres,
       });
       setProfile((current) => ({ ...current, user: response.user }));
       setUser(response.user);
+      setProfileModalOpen(false);
       showToast("Profile updated", "success");
     } catch (error) {
       showToast(error.message || "Could not update profile", "error");
+    } finally {
+      setSavingState((current) => ({ ...current, profile: false }));
     }
   };
 
@@ -386,7 +561,7 @@ export default function Dashboard() {
         <p className="mt-4 max-w-2xl text-base leading-7 text-white/65">{homeFeed?.greeting?.subtitle || "Search, like, replay, and organize your sessions in a Spotify-style flow."}</p>
         <div className="mt-6 flex flex-wrap gap-3">
           <button onClick={() => setActiveView("search")} className="rounded-full bg-[#1db954] px-5 py-3 text-sm font-bold text-black transition hover:bg-[#1ed760]">Start Listening</button>
-          <button onClick={promptCreatePlaylist} className="rounded-full border border-white/15 px-5 py-3 text-sm font-semibold text-white transition hover:bg-white/6">Create Playlist</button>
+          <button onClick={openCreatePlaylist} className="rounded-full border border-white/15 px-5 py-3 text-sm font-semibold text-white transition hover:bg-white/6">Create Playlist</button>
         </div>
       </section>
 
@@ -428,6 +603,43 @@ export default function Dashboard() {
               }
             />
           ))}
+        </div>
+      </section>
+
+      <section className="grid gap-6 xl:grid-cols-2">
+        <div>
+          <div className="mb-4 flex items-end justify-between">
+            <h2 className="text-2xl font-black text-white">Top artists</h2>
+            <span className="text-sm text-white/50">Based on your current library</span>
+          </div>
+          <div className="grid gap-4 sm:grid-cols-2">
+            {topArtists.map((artist) => (
+              <Card
+                key={artist.name}
+                title={artist.name}
+                subtitle={`${artist.count} tracks in your orbit`}
+                image={artist.image}
+                onClick={() => { setEntityDetail({ type: "artist", ...artist }); setActiveView("detail"); }}
+              />
+            ))}
+          </div>
+        </div>
+        <div>
+          <div className="mb-4 flex items-end justify-between">
+            <h2 className="text-2xl font-black text-white">Album moods</h2>
+            <span className="text-sm text-white/50">Quick jumps into your album clusters</span>
+          </div>
+          <div className="grid gap-4 sm:grid-cols-2">
+            {topAlbums.map((album) => (
+              <Card
+                key={album.name}
+                title={album.name}
+                subtitle={`${album.count} tracks gathered here`}
+                image={album.image}
+                onClick={() => { setEntityDetail({ type: "album", ...album }); setActiveView("detail"); }}
+              />
+            ))}
+          </div>
         </div>
       </section>
 
@@ -475,7 +687,7 @@ export default function Dashboard() {
       <div className="space-y-8">
         <div className="flex items-end justify-between">
           <h2 className="text-2xl font-black text-white">Your playlists</h2>
-          <button onClick={promptCreatePlaylist} className="rounded-full bg-[#1db954] px-5 py-3 text-sm font-bold text-black transition hover:bg-[#1ed760]">New Playlist</button>
+          <button onClick={openCreatePlaylist} className="rounded-full bg-[#1db954] px-5 py-3 text-sm font-bold text-black transition hover:bg-[#1ed760]">New Playlist</button>
         </div>
         <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
           {playlists.length ? playlists.map((playlist) => (
@@ -512,6 +724,28 @@ export default function Dashboard() {
           </div>
         </section>
         {renderRows(selectedPlaylist.songs || [], "playlist")}
+      </div>
+    );
+  }
+
+  if (activeView === "detail" && entityDetail) {
+    content = (
+      <div className="space-y-8">
+        <section className="rounded-[36px] border border-white/8 bg-[linear-gradient(135deg,rgba(29,185,84,0.12),rgba(12,12,12,0.98))] p-6 md:p-8">
+          <div className="grid gap-6 lg:grid-cols-[320px,1fr]">
+            <img src={entityDetail.image || FALLBACK_ART} alt="" className="aspect-square w-full max-w-[320px] rounded-[32px] object-cover" />
+            <div className="flex flex-col justify-end">
+              <p className="text-xs uppercase tracking-[0.35em] text-white/45">{entityDetail.type}</p>
+              <h1 className="mt-3 text-4xl font-black text-white md:text-6xl">{entityDetail.name}</h1>
+              <p className="mt-3 text-sm text-white/60">{entityDetail.count} tracks collected from your library and listening history.</p>
+              <div className="mt-6 flex flex-wrap gap-3">
+                <button onClick={() => playTrack(entityDetail.tracks[0], entityDetail.tracks, 0, entityDetail.type, entityDetail.name)} className="rounded-full bg-[#1db954] px-5 py-3 text-sm font-bold text-black transition hover:bg-[#1ed760]">Play Mix</button>
+                <button onClick={() => runSearch(entityDetail.name)} className="rounded-full border border-white/15 px-5 py-3 text-sm font-semibold text-white transition hover:bg-white/6">Search More</button>
+              </div>
+            </div>
+          </div>
+        </section>
+        {renderRows(entityDetail.tracks, entityDetail.type)}
       </div>
     );
   }
@@ -596,7 +830,7 @@ export default function Dashboard() {
           <div className="mt-6 rounded-[28px] border border-white/8 bg-white/4 p-4">
             <div className="flex items-center justify-between">
               <p className="text-sm font-bold text-white">Your library</p>
-              <button onClick={promptCreatePlaylist} className="rounded-full bg-[#1db954] p-2 text-black">
+              <button onClick={openCreatePlaylist} className="rounded-full bg-[#1db954] p-2 text-black">
                 <Plus size={16} />
               </button>
             </div>
@@ -654,6 +888,34 @@ export default function Dashboard() {
           <PlayerDock />
         </div>
       </div>
+
+      {playlistModal ? (
+        <PlaylistModal
+          initialValue={playlistModal.mode === "rename" ? playlistModal.playlist : null}
+          onClose={() => setPlaylistModal(null)}
+          onSave={playlistModal.mode === "rename" ? saveRenamedPlaylist : savePlaylist}
+          saving={savingState.playlist}
+        />
+      ) : null}
+
+      {addTrackModal ? (
+        <AddTrackModal
+          playlists={playlists}
+          track={addTrackModal}
+          onClose={() => setAddTrackModal(null)}
+          onSelect={addTrackToSelectedPlaylist}
+          saving={savingState.addTrack}
+        />
+      ) : null}
+
+      {profileModalOpen ? (
+        <ProfileModal
+          initialUser={profile?.user || user}
+          onClose={() => setProfileModalOpen(false)}
+          onSave={saveProfile}
+          saving={savingState.profile}
+        />
+      ) : null}
     </div>
   );
 }
