@@ -1,20 +1,42 @@
-const API_URL = `${import.meta.env.VITE_API_URL}/api/youtube/search`;
+const API_URL = `${import.meta.env.VITE_API_URL}/api/youtube`;
 
-export const searchYouTube = async (query) => {
+const authorizedFetch = async (url) => {
   const token = localStorage.getItem("token");
 
-  const res = await fetch(`${API_URL}?query=${encodeURIComponent(query)}`, {
+  const res = await fetch(url, {
     headers: {
       Authorization: `Bearer ${token}`,
     },
   });
 
   if (!res.ok) {
-    // Attach the HTTP status so callers can handle 429 (rate limit) separately
-    const err = new Error(`YouTube search failed (${res.status})`);
+    const err = new Error(`Request failed (${res.status})`);
     err.status = res.status;
     throw err;
   }
 
   return res.json();
+};
+
+export const searchYouTube = async (query) => {
+  return authorizedFetch(`${API_URL}/search?query=${encodeURIComponent(query)}`);
+};
+
+export const searchYouTubeMusic = async (query, type) => {
+  return authorizedFetch(
+    `${API_URL}/search/music?query=${encodeURIComponent(query)}&type=${encodeURIComponent(type)}`
+  );
+};
+
+export const getYouTubePlaylistTracks = async (playlistId) => {
+  const data = await authorizedFetch(`${API_URL}/playlist/${encodeURIComponent(playlistId)}`);
+  return data.tracks || [];
+};
+
+export const getYouTubeAlbumTracks = async (browseId) => {
+  return authorizedFetch(`${API_URL}/album/${encodeURIComponent(browseId)}`);
+};
+
+export const getYouTubeArtistTracks = async (browseId) => {
+  return authorizedFetch(`${API_URL}/artist/${encodeURIComponent(browseId)}`);
 };

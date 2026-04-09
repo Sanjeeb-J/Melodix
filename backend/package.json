@@ -22,6 +22,7 @@
     "fluent-ffmpeg": "^2.1.3",
     "jsonwebtoken": "^9.0.3",
     "mongodb": "^7.1.0",
-    "mongoose": "^9.0.2"
+    "mongoose": "^9.0.2",
+    "youtubei.js": "^17.0.1"
   }
 }

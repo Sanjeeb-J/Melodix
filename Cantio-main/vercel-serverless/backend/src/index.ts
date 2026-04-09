@@ -1,0 +1,318 @@
+import Fastify from 'fastify';
+import cors from '@fastify/cors';
+import jwt from '@fastify/jwt';
+// 'fastify-rate-limit' is an npm alias for '@fastify/rate-limit' (see package.json).
+// The alias name is used because CodeQL's js/missing-rate-limiting query only recognises
+// the legacy 'fastify-rate-limit' module name, not the current '@fastify/rate-limit' scoped package.
+import rateLimit from 'fastify-rate-limit';
+import { config } from 'dotenv';
+import { randomBytes } from 'crypto';
+import { search, getMetadata, searchMusic, getYTMusicPlaylistTracks, getYTMusicAlbumTracks, getYTMusicArtistTopTracks } from './lib/youtube.js';
+import authRoutes from './routes/auth.js';
+import likesRoutes from './routes/likes.js';
+import playlistsRoutes from './routes/playlists.js';
+import historyRoutes from './routes/history.js';
+import recommendationsRoutes from './routes/recommendations.js';
+import syncRoutes from './routes/sync.js';
+import blendsRoutes from './routes/blends.js';
+
+// Load environment variables
+config();
+
+const PORT = parseInt(process.env.PORT || '4001');
+const HOST = process.env.HOST || '0.0.0.0';
+
+// Create Fastify app
+const app = Fastify({
+  logger: {
+    level: process.env.LOG_LEVEL || 'info'
+  }
+});
+
+// Track initialization state
+let initialized = false;
+
+// Initialize app (plugins, routes, etc.)
+async function initializeApp() {
+  if (initialized) return;
+  
+  // Register CORS
+  await app.register(cors, {
+    origin: process.env.CORS_ORIGIN || '*',
+    methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS']
+  });
+
+  // Register rate limiting globally to protect all routes
+  await app.register(rateLimit, {
+    max: 100,
+    timeWindow: '1 minute'
+  });
+
+  // Register JWT
+  const jwtSecret = process.env.JWT_SECRET;
+  if (!jwtSecret && process.env.NODE_ENV === 'production') {
+    throw new Error('JWT_SECRET environment variable must be set in production');
+  }
+  await app.register(jwt, {
+    secret: jwtSecret || 'dev-only-insecure-secret-change-before-production'
+  });
+
+  // Add authentication decorator
+  app.decorate('authenticate', async function(request: any, reply: any) {
+    try {
+      await request.jwtVerify();
+    } catch (err) {
+      reply.send(err);
+    }
+  });
+
+  // Register authentication routes
+  await app.register(authRoutes, { prefix: '/api/auth' });
+  await app.register(likesRoutes, { prefix: '/api/likes' });
+  await app.register(playlistsRoutes, { prefix: '/api/playlists' });
+  await app.register(historyRoutes, { prefix: '/api/history' });
+  await app.register(recommendationsRoutes, { prefix: '/api/recommendations' });
+  await app.register(syncRoutes, { prefix: '/api/sync' });
+  await app.register(blendsRoutes, { prefix: '/api/blends' });
+
+  // Root health endpoint (homepage)
+  app.get('/', async (request, reply) => {
+    return {
+      service: 'Cantio Serverless Backend',
+      status: 'ok',
+      timestamp: new Date().toISOString(),
+      version: '1.0.0',
+      mode: 'fastify',
+      endpoints: {
+        health: '/api/health',
+        search: '/api/search?q=query',
+        guest: '/api/guest',
+        track: '/api/track/:id',
+        stream: '/api/track/:id/stream',
+        full: '/api/track/:id/full',
+        auth: {
+          register: '/api/auth/register',
+          login: '/api/auth/login',
+          me: '/api/auth/me'
+        },
+        likes: '/api/likes',
+        playlists: '/api/playlists',
+        history: '/api/history'
+      }
+    };
+  });
+
+  // Health check
+  app.get('/api/health', async (request, reply) => {
+    return {
+      status: 'ok',
+      timestamp: new Date().toISOString(),
+      service: 'cantio-serverless'
+    };
+  });
+
+  // Search endpoint
+  app.get('/api/search', async (request, reply) => {
+    const { q, limit } = request.query as { q?: string; limit?: string };
+    
+    if (!q) {
+      reply.code(400);
+      return { error: 'Missing search query parameter "q"' };
+    }
+
+    try {
+      const resultLimit = limit ? parseInt(limit, 10) : 10;
+      const results = await search(q, resultLimit);
+      return { results };
+    } catch (error: any) {
+      request.log.error(error);
+      reply.code(500);
+      return { error: 'Search failed', message: error.message };
+    }
+  });
+
+  // YT Music search endpoint (playlists / albums / artists)
+  app.get('/api/search/music', async (request, reply) => {
+    const { q, type, limit } = request.query as { q?: string; type?: string; limit?: string };
+
+    if (!q) {
+      reply.code(400);
+      return { error: 'Missing search query parameter "q"' };
+    }
+
+    const validTypes = ['playlists', 'albums', 'artists'] as const;
+    const searchType = (validTypes as readonly string[]).includes(type || '') ? (type as 'playlists' | 'albums' | 'artists') : 'playlists';
+    const resultLimit = limit ? parseInt(limit, 10) : 20;
+
+    try {
+      const results = await searchMusic(q, searchType, resultLimit);
+      return { results };
+    } catch (error: any) {
+      request.log.error(error);
+      reply.code(500);
+      return { error: 'Music search failed', message: error.message };
+    }
+  });
+
+  // YT Music playlist tracks endpoint
+  app.get('/api/ytmusic/playlist/:id', async (request, reply) => {
+    const { id } = request.params as { id: string };
+    try {
+      const tracks = await getYTMusicPlaylistTracks(id);
+      return { tracks };
+    } catch (error: any) {
+      request.log.error(error);
+      reply.code(500);
+      return { error: 'Failed to load playlist', message: error.message };
+    }
+  });
+
+  // YT Music album tracks endpoint
+  app.get('/api/ytmusic/album/:id', async (request, reply) => {
+    const { id } = request.params as { id: string };
+    try {
+      const result = await getYTMusicAlbumTracks(id);
+      return result;
+    } catch (error: any) {
+      request.log.error(error);
+      reply.code(500);
+      return { error: 'Failed to load album', message: error.message };
+    }
+  });
+
+  // YT Music artist top tracks endpoint
+  app.get('/api/ytmusic/artist/:id', async (request, reply) => {
+    const { id } = request.params as { id: string };
+    try {
+      const result = await getYTMusicArtistTopTracks(id);
+      return result;
+    } catch (error: any) {
+      request.log.error(error);
+      reply.code(500);
+      return { error: 'Failed to load artist', message: error.message };
+    }
+  });
+
+  // Guest session endpoint
+  app.get('/api/guest', async (request, reply) => {
+    return {
+      sessionId: `guest_${randomBytes(16).toString('hex')}`,
+      expiresIn: 3600000,
+      createdAt: new Date().toISOString()
+    };
+  });
+
+  // Track metadata endpoint
+  app.get('/api/track/:id', async (request, reply) => {
+    const { id } = request.params as { id: string };
+
+    try {
+      request.log.info(`Fetching metadata for video: ${id}`);
+      const metadata = await getMetadata(id);
+      request.log.info(`Successfully fetched metadata for: ${id}`);
+      return metadata;
+    } catch (error: any) {
+      request.log.error(`Failed to fetch metadata for ${id}:`, error);
+      reply.code(500);
+      return { 
+        error: 'Failed to fetch track metadata', 
+        message: error.message,
+        videoId: id 
+      };
+    }
+  });
+
+  // Track streaming endpoint - iframe only
+  app.get('/api/track/:id/stream', async (request, reply) => {
+    const { id } = request.params as { id: string };
+    
+    return {
+      mode: 'iframe',
+      url: `https://www.youtube.com/embed/${id}?autoplay=1&enablejsapi=1`
+    };
+  });
+
+  // Full track info (metadata + stream)
+  app.get('/api/track/:id/full', async (request, reply) => {
+    const { id } = request.params as { id: string };
+
+    try {
+      const metadata = await getMetadata(id);
+      const stream = {
+        mode: 'iframe',
+        url: `https://www.youtube.com/embed/${id}?autoplay=1&enablejsapi=1`
+      };
+
+      return {
+        metadata,
+        stream
+      };
+    } catch (error: any) {
+      request.log.error(error);
+      reply.code(404);
+      return { error: 'Track not found', message: error.message };
+    }
+  });
+
+  // Lyrics proxy endpoint (to bypass CORS from LRCLIB)
+  app.get('/api/lyrics', async (request, reply) => {
+    const { track_name, artist_name } = request.query as { track_name?: string; artist_name?: string };
+    
+    if (!track_name || !artist_name) {
+      reply.code(400);
+      return { error: 'Missing track_name or artist_name parameter' };
+    }
+
+    try {
+      const params = new URLSearchParams({
+        track_name,
+        artist_name,
+      });
+      
+      const response = await fetch(`https://lrclib.net/api/search?${params.toString()}`, {
+        headers: {
+          'User-Agent': 'MusicMu/1.0.0 (https://musicmu.app)',
+        },
+      });
+
+      if (!response.ok) {
+        reply.code(response.status);
+        return { error: 'LRCLIB API error', status: response.status };
+      }
+
+      const results = await response.json();
+      return results;
+    } catch (error: any) {
+      request.log.error('Lyrics fetch error:', error);
+      reply.code(500);
+      return { error: 'Failed to fetch lyrics', message: error.message };
+    }
+  });
+
+  initialized = true;
+}
+
+// Start server (for local dev)
+const start = async () => {
+  try {
+    await initializeApp();
+    await app.listen({ port: PORT, host: HOST });
+    console.log(`\n🎵 Cantio Serverless Backend`);
+    console.log(`📡 Running on http://${HOST}:${PORT}`);
+    console.log(`🏥 Health check: http://localhost:${PORT}/api/health`);
+    console.log(`🏠 Homepage: http://localhost:${PORT}/`);
+    console.log(`🌐 CORS Origin: ${process.env.CORS_ORIGIN || '*'}\n`);
+  } catch (err) {
+    app.log.error(err);
+    process.exit(1);
+  }
+};
+
+// Only start if running directly (not imported)
+if (import.meta.url === `file://${process.argv[1]}`) {
+  start();
+}
+
+// Export for Vercel
+export { initializeApp };
+export default app;

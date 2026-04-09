@@ -52,6 +52,7 @@ const loadYouTubeApi = () => {
 };
 
 const buildSequentialOrder = (length) => Array.from({ length }, (_, index) => index);
+const getSongId = (song) => song?.youtubeId || song?.videoId || song?._id || null;
 
 const shuffleIndices = (indices) => {
   const shuffled = [...indices];
@@ -141,6 +142,72 @@ export const PlayerProvider = ({ children }) => {
     setIsLoading(true);
     setLoadingMessage("Loading song...");
   }, [isShuffle]);
+
+  const playNow = useCallback((song) => {
+    if (!song) return;
+
+    const currentQueue = queueRef.current;
+    const currentOrder = playbackOrderRef.current;
+    const currentPlaybackIndex = playbackIndexRef.current;
+    const songId = getSongId(song);
+
+    if (!currentQueue.length || !currentOrder.length || !songId) {
+      playSong(song);
+      return;
+    }
+
+    const existingQueueIndex = currentQueue.findIndex(
+      (item) => getSongId(item) === songId
+    );
+
+    if (existingQueueIndex === -1) {
+      setCurrentSong(song);
+      setIsPlaying(true);
+      setIsLoading(true);
+      setLoadingMessage("Loading song...");
+      return;
+    }
+
+    const existingPlaybackIndex = currentOrder.indexOf(existingQueueIndex);
+
+    if (existingPlaybackIndex === -1) {
+      playSong(song, currentQueue, existingQueueIndex);
+      return;
+    }
+
+    setQueueIndex(existingQueueIndex);
+    setPlaybackIndex(existingPlaybackIndex);
+    setCurrentSong(currentQueue[existingQueueIndex]);
+    setIsPlaying(true);
+    setIsLoading(true);
+    setLoadingMessage("Loading song...");
+  }, [playSong]);
+
+  const playQueueItem = useCallback((playbackOrderIndex) => {
+    const currentQueue = queueRef.current;
+    const currentOrder = playbackOrderRef.current;
+
+    if (
+      !currentQueue.length ||
+      !currentOrder.length ||
+      playbackOrderIndex < 0 ||
+      playbackOrderIndex >= currentOrder.length
+    ) {
+      return;
+    }
+
+    const nextQueueIndex = currentOrder[playbackOrderIndex];
+    const nextSong = currentQueue[nextQueueIndex];
+
+    if (!nextSong) return;
+
+    setQueueIndex(nextQueueIndex);
+    setPlaybackIndex(playbackOrderIndex);
+    setCurrentSong(nextSong);
+    setIsPlaying(true);
+    setIsLoading(true);
+    setLoadingMessage("Loading song...");
+  }, []);
 
   const togglePlay = useCallback(() => {
     const player = playerRef.current;
@@ -302,7 +369,16 @@ export const PlayerProvider = ({ children }) => {
 
   const upcomingQueue = playbackOrder
     .slice(playbackIndex + 1)
-    .map((index) => queue[index])
+    .map((itemIndex, offset) => {
+      const song = queue[itemIndex];
+      if (!song) return null;
+
+      return {
+        song,
+        queueIndex: itemIndex,
+        playbackOrderIndex: playbackIndex + offset + 1,
+      };
+    })
     .filter(Boolean);
 
   useEffect(() => {
@@ -592,6 +668,8 @@ export const PlayerProvider = ({ children }) => {
         queue,
         upcomingQueue,
         playSong,
+        playNow,
+        playQueueItem,
         togglePlay,
         nextSong,
         prevSong,

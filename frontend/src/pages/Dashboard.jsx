@@ -15,7 +15,13 @@ import {
   deletePlaylist,
   markPlaylistPlayed,
 } from "../services/playlistService";
-import { searchYouTube } from "../services/youtubeService";
+import {
+  searchYouTube,
+  searchYouTubeMusic,
+  getYouTubePlaylistTracks,
+  getYouTubeAlbumTracks,
+  getYouTubeArtistTracks,
+} from "../services/youtubeService";
 import { getPlaylistCover } from "../utils/playlistCover";
 import {
   Home,
@@ -40,6 +46,9 @@ import {
   ChevronRight,
   Music2,
   ListMusic,
+  Disc3,
+  Mic2,
+  PlayCircle,
   Loader2,
   Menu,
   ExternalLink,
@@ -70,6 +79,7 @@ function PlayerBar() {
     isLoading,
     loadingMessage,
     upcomingQueue,
+    playQueueItem,
     togglePlay,
     nextSong,
     prevSong,
@@ -138,22 +148,29 @@ function PlayerBar() {
             <p className="text-xs font-bold uppercase tracking-wider text-[rgba(164,255,198,0.8)] mb-3">Next up</p>
             {upcomingQueue.length ? (
               <div className="space-y-2.5 sm:space-y-3">
-                {upcomingQueue.map((song, index) => (
-                  <div key={`${song.youtubeId || song.videoId || song.name}-${index}`} className="flex items-center gap-2.5 sm:gap-3">
+                {upcomingQueue.map((item, index) => (
+                  <button
+                    key={`${item.song.youtubeId || item.song.videoId || item.song.name}-${index}`}
+                    onClick={() => {
+                      playQueueItem(item.playbackOrderIndex);
+                      setIsQueueOpen(false);
+                    }}
+                    className="w-full flex items-center gap-2.5 sm:gap-3 text-left hover:bg-[rgba(255,255,255,0.06)] rounded-md p-2 transition-all"
+                  >
                     <img
-                      src={song.thumbnail}
-                      alt={song.name || song.title}
+                      src={item.song.thumbnail}
+                      alt={item.song.name || item.song.title}
                       className="w-10 h-10 sm:w-11 sm:h-11 rounded object-cover flex-shrink-0"
                     />
                     <div className="min-w-0">
                       <p className="text-[13px] sm:text-sm font-semibold text-white truncate">
-                        {song.name || song.title}
+                        {item.song.name || item.song.title}
                       </p>
                       <p className="text-xs text-sp-dim truncate">
-                        {song.artist} {song.duration ? `· ${song.duration}` : ""}
+                        {item.song.artist} {item.song.duration ? `· ${item.song.duration}` : ""}
                       </p>
                     </div>
-                  </div>
+                  </button>
                 ))}
               </div>
             ) : (
@@ -620,18 +637,27 @@ function PlaylistCard({ playlist: p, onClick }) {
 // ─── SearchView ────────────────────────────────────────
 function SearchView({ selectedPlaylist, playlists, onPlaylistSelect, onUpdate }) {
   const [query, setQuery] = useState("");
+  const [filter, setFilter] = useState("songs");
   const [results, setResults] = useState([]);
   const [loading, setLoading] = useState(false);
   const [addingId, setAddingId] = useState(null);
   const { showToast } = useToast();
+  const { playSong } = usePlayer();
 
   // ✅ Client-side cache: avoids duplicate API calls within the same session
   const searchCache = useRef({});
 
+  const filterOptions = [
+    { id: "songs", label: "Songs", icon: ListMusic },
+    { id: "playlists", label: "Playlists", icon: PlayCircle },
+    { id: "albums", label: "Albums", icon: Disc3 },
+    { id: "artists", label: "Artists", icon: Mic2 },
+  ];
+
   const handleSearch = async () => {
     if (!query.trim()) return;
 
-    const cacheKey = query.trim().toLowerCase();
+    const cacheKey = `${filter}:${query.trim().toLowerCase()}`;
 
     // Serve from in-memory cache if available
     if (searchCache.current[cacheKey]) {
@@ -641,7 +667,10 @@ function SearchView({ selectedPlaylist, playlists, onPlaylistSelect, onUpdate })
 
     setLoading(true);
     try {
-      const data = await searchYouTube(query);
+      const data =
+        filter === "songs"
+          ? await searchYouTube(query)
+          : await searchYouTubeMusic(query, filter);
       searchCache.current[cacheKey] = data; // ✅ Cache result
       setResults(data);
     } catch (err) {
@@ -650,6 +679,50 @@ function SearchView({ selectedPlaylist, playlists, onPlaylistSelect, onUpdate })
       } else {
         showToast("Search failed", "error");
       }
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handlePlaySongResult = (song, index) => {
+    playSong(song, results, index);
+  };
+
+  const handleOpenMusicResult = async (item) => {
+    setLoading(true);
+
+    try {
+      if (item.type === "playlist") {
+        const tracks = await getYouTubePlaylistTracks(item.playlistId);
+        if (!tracks.length) {
+          showToast("This playlist has no playable songs", "error");
+          return;
+        }
+        playSong(tracks[0], tracks, 0);
+        showToast(`Playing ${item.title}`, "success");
+        return;
+      }
+
+      if (item.type === "album") {
+        const data = await getYouTubeAlbumTracks(item.browseId);
+        if (!data.tracks?.length) {
+          showToast("This album has no playable songs", "error");
+          return;
+        }
+        playSong(data.tracks[0], data.tracks, 0);
+        showToast(`Playing ${data.title}`, "success");
+        return;
+      }
+
+      const data = await getYouTubeArtistTracks(item.browseId);
+      if (!data.tracks?.length) {
+        showToast("No playable songs found for this artist", "error");
+        return;
+      }
+      playSong(data.tracks[0], data.tracks, 0);
+      showToast(`Playing top songs from ${data.name}`, "success");
+    } catch (err) {
+      showToast("Could not load this result", "error");
     } finally {
       setLoading(false);
     }
@@ -704,6 +777,31 @@ function SearchView({ selectedPlaylist, playlists, onPlaylistSelect, onUpdate })
         </select>
       </div>
 
+      <div className="flex flex-wrap gap-2 mb-5">
+        {filterOptions.map((option) => {
+          const Icon = option.icon;
+          const active = filter === option.id;
+
+          return (
+            <button
+              key={option.id}
+              onClick={() => {
+                setFilter(option.id);
+                setResults([]);
+              }}
+              className={`flex items-center gap-2 px-4 py-2 rounded-full text-sm font-bold transition-all ${
+                active
+                  ? "bg-white text-black"
+                  : "bg-[rgba(255,255,255,0.08)] text-white hover:bg-[rgba(255,255,255,0.14)]"
+              }`}
+            >
+              <Icon size={15} />
+              {option.label}
+            </button>
+          );
+        })}
+      </div>
+
       {/* Search input */}
       <div className="flex gap-3 mb-6">
         <div className="relative flex-1 max-w-lg">
@@ -729,31 +827,69 @@ function SearchView({ selectedPlaylist, playlists, onPlaylistSelect, onUpdate })
       {/* Results */}
       {results.length > 0 && (
         <div>
-          <h3 className="text-lg font-bold mb-3">Results</h3>
-          <div className="flex flex-col gap-1">
-            {results.map((song, i) => (
-              <div
-                key={song.videoId}
-                className="flex items-center gap-4 p-3 rounded-md hover:bg-sp-hover transition-all group"
-              >
-                <span className="text-sp-muted text-sm w-4 text-center group-hover:hidden">{i + 1}</span>
-                <Play size={14} className="text-white hidden group-hover:block w-4" fill="currentColor" />
-                <img src={song.thumbnail} alt="" className="w-10 h-10 rounded object-cover" />
-                <div className="flex-1 min-w-0">
-                  <p className="text-sm font-semibold text-white truncate">{song.title}</p>
-                  <p className="text-xs text-sp-dim truncate">{song.artist}</p>
-                </div>
-                <span className="text-xs text-sp-muted font-mono">{song.duration}</span>
-                <button
-                  onClick={() => handleAdd(song)}
-                  disabled={addingId === song.videoId}
-                  className="px-4 py-1.5 rounded-full border border-sp-dim text-sp-dim hover:border-white hover:text-white text-xs font-bold transition-all"
+          <h3 className="text-lg font-bold mb-3 capitalize">{filter}</h3>
+
+          {filter === "songs" ? (
+            <div className="flex flex-col gap-1">
+              {results.map((song, i) => (
+                <div
+                  key={song.videoId}
+                  onClick={() => handlePlaySongResult(song, i)}
+                  className="flex items-center gap-4 p-3 rounded-md hover:bg-sp-hover transition-all group cursor-pointer"
                 >
-                  {addingId === song.videoId ? <Loader2 size={12} className="animate-spin" /> : "+ Add"}
+                  <span className="text-sp-muted text-sm w-4 text-center group-hover:hidden">{i + 1}</span>
+                  <Play size={14} className="text-white hidden group-hover:block w-4" fill="currentColor" />
+                  <img src={song.thumbnail} alt="" className="w-10 h-10 rounded object-cover" />
+                  <div className="flex-1 min-w-0">
+                    <p className="text-sm font-semibold text-white truncate">{song.title}</p>
+                    <p className="text-xs text-sp-dim truncate">{song.artist}</p>
+                  </div>
+                  <span className="text-xs text-sp-muted font-mono">{song.duration}</span>
+                  <button
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      handleAdd(song);
+                    }}
+                    disabled={addingId === song.videoId}
+                    className="px-4 py-1.5 rounded-full border border-sp-dim text-sp-dim hover:border-white hover:text-white text-xs font-bold transition-all"
+                  >
+                    {addingId === song.videoId ? <Loader2 size={12} className="animate-spin" /> : "+ Add"}
+                  </button>
+                </div>
+              ))}
+            </div>
+          ) : (
+            <div className="grid grid-cols-2 md:grid-cols-4 xl:grid-cols-5 gap-4">
+              {results.map((item) => (
+                <button
+                  key={item.playlistId || item.browseId}
+                  onClick={() => handleOpenMusicResult(item)}
+                  className="text-left p-4 rounded-xl bg-[#181818] hover:bg-sp-hover transition-all"
+                >
+                  <img
+                    src={item.thumbnail}
+                    alt={item.title || item.name}
+                    className={`w-full aspect-square object-cover mb-3 ${item.type === "artist" ? "rounded-full" : "rounded-lg"}`}
+                  />
+                  <p className="text-sm font-bold text-white truncate">
+                    {item.title || item.name}
+                  </p>
+                  <p className="text-xs text-sp-dim truncate mt-1">
+                    {item.author || item.artist || item.subscribers || "YouTube Music"}
+                  </p>
+                  {item.year && (
+                    <p className="text-xs text-sp-muted mt-1">{item.year}</p>
+                  )}
                 </button>
-              </div>
-            ))}
-          </div>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
+
+      {!loading && query && results.length === 0 && (
+        <div className="py-12 text-center text-sp-muted">
+          <p className="text-sm font-bold">No {filter} found for "{query}"</p>
         </div>
       )}
     </div>

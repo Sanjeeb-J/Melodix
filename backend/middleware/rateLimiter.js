@@ -3,7 +3,7 @@
 // Each authenticated user is limited to 15 searches per minute.
 // Unauthenticated users are limited by IP (fallback).
 
-const rateLimit = require("express-rate-limit");
+const { rateLimit, ipKeyGenerator } = require("express-rate-limit");
 
 const searchLimiter = rateLimit({
   windowMs: 60 * 1000, // 1 minute window
@@ -13,7 +13,7 @@ const searchLimiter = rateLimit({
 
   // Key by user ID if authenticated, else by IP
   keyGenerator: (req) => {
-    return req.user?._id?.toString() || req.user?.id?.toString() || req.ip;
+    return req.user?._id?.toString() || req.user?.id?.toString() || ipKeyGenerator(req);
   },
 
   handler: (req, res) => {
