@@ -55,17 +55,20 @@ async function startServer() {
       yt = await Innertube.create({ ...options, cookie: process.env.YOUTUBE_COOKIE });
     } else {
       console.log("[Stream] Initializing GUEST session (no cookies)...");
-      yt = await Innertube.create(options);
+      // Use standard Innertube.create() for widest compatibility when failing
+      try {
+        yt = await Innertube.create(options);
+      } catch (e) {
+        console.warn("[Stream] Preferred client failed, falling back to default WEB client...");
+        yt = await Innertube.create(); 
+      }
     }
     
-    console.log(`[Stream] youtubei.js initialized as ${options.device_category} client`);
+    console.log(`[Stream] youtubei.js initialized successfully`);
     app.set('yt', yt);
   } catch (err) {
-    console.error("[Stream] Failed to initialize youtubei.js (falling back):", err.message);
-    try {
-      yt = await Innertube.create();
-      app.set('yt', yt);
-    } catch (e) {}
+    console.error(`[Stream] youtubei.js initialization failed: ${err.message}. Streaming will rely on yt-dlp fallback.`);
+    app.set('yt', null); // Explicitly null so controller knows to skip it
   }
 
 const corsOptions = {
