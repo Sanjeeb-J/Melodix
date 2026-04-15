@@ -161,9 +161,8 @@ const streamAudio = async (req, res) => {
   } catch (err) {
     console.error(`[Stream] Fatal: ${err.message}`);
     if (!res.writableEnded) {
-       // Since we set res.writeHead(200) early, we can't change the status code now.
-       // We just end the stream to let the client handle the error.
        res.end();
+    }
   }
 };
 
