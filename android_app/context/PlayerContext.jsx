@@ -1,5 +1,5 @@
 import React, { createContext, useCallback, useContext, useEffect, useRef, useState } from 'react';
-import { Audio, InterruptionModeAndroid, InterruptionModeIOS } from 'expo-av';
+import { useAudioPlayer, useAudioPlayerStatus, setAudioModeAsync } from 'expo-audio';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { getStreamUrl } from '../services/streamService';
 
@@ -17,17 +17,14 @@ const shuffleIndices = (indices) => {
   return shuffled;
 };
 
-const fmtTime = (s) => {
+export const fmtTime = (s) => {
   if (!s || isNaN(s)) return '0:00';
   const m = Math.floor(s / 60);
   const sec = Math.floor(s % 60);
   return `${m}:${sec.toString().padStart(2, '0')}`;
 };
 
-export { fmtTime };
-
 export const PlayerProvider = ({ children }) => {
-  const soundRef = useRef(null);
   const repeatModeRef = useRef('none');
   const queueRef = useRef([]);
   const playbackOrderRef = useRef([]);
@@ -35,20 +32,26 @@ export const PlayerProvider = ({ children }) => {
   const nextSongFnRef = useRef(null);
   const isMountedRef = useRef(true);
 
+  const [streamUrl, setStreamUrl] = useState(null);
   const [currentSong, setCurrentSong] = useState(null);
   const [queue, setQueue] = useState([]);
   const [queueIndex, setQueueIndex] = useState(0);
   const [playbackOrder, setPlaybackOrder] = useState([]);
   const [playbackIndex, setPlaybackIndex] = useState(0);
-  const [isPlaying, setIsPlaying] = useState(false);
   const [isShuffle, setIsShuffle] = useState(false);
   const [repeatMode, setRepeatMode] = useState('none');
   const [volume, setVolumeState] = useState(0.7);
   const [isMuted, setIsMuted] = useState(false);
-  const [progress, setProgress] = useState(0);
-  const [duration, setDuration] = useState(0);
-  const [currentTime, setCurrentTime] = useState(0);
   const [isLoading, setIsLoading] = useState(false);
+
+  // expo-audio player — starts paused, URL provided via replace()
+  const player = useAudioPlayer(streamUrl ? { uri: streamUrl } : null);
+  const status = useAudioPlayerStatus(player);
+
+  const isPlaying = status?.playing ?? false;
+  const currentTime = status?.currentTime ?? 0;
+  const duration = status?.duration ?? 0;
+  const progress = duration > 0 ? currentTime / duration : 0;
 
   // Keep refs in sync
   useEffect(() => { repeatModeRef.current = repeatMode; }, [repeatMode]);
@@ -56,82 +59,63 @@ export const PlayerProvider = ({ children }) => {
   useEffect(() => { playbackOrderRef.current = playbackOrder; }, [playbackOrder]);
   useEffect(() => { playbackIndexRef.current = playbackIndex; }, [playbackIndex]);
 
+  // Set audio mode once on mount
   useEffect(() => {
     isMountedRef.current = true;
-    Audio.setAudioModeAsync({
+    setAudioModeAsync({
       allowsRecordingIOS: false,
       staysActiveInBackground: true,
-      interruptionModeIOS: InterruptionModeIOS.DoNotMix,
       playsInSilentModeIOS: true,
-      shouldDuckAndroid: false, // Don't duck, music should be primary
-      interruptionModeAndroid: InterruptionModeAndroid.DoNotMix,
+      shouldDuckAndroid: false,
       playThroughEarpieceAndroid: false,
     });
-    return () => {
-      isMountedRef.current = false;
-      soundRef.current?.unloadAsync();
-    };
+    return () => { isMountedRef.current = false; };
   }, []);
 
-  const loadAndPlay = useCallback(async (song, shouldPlay = true) => {
+  // Handle song ended — advance queue
+  useEffect(() => {
+    if (status?.didJustFinish) {
+      nextSongFnRef.current?.();
+    }
+  }, [status?.didJustFinish]);
+
+  // Apply volume changes
+  useEffect(() => {
+    if (player) {
+      player.volume = isMuted ? 0 : volume;
+    }
+  }, [volume, isMuted, player]);
+
+  // ── loadAndPlay: fetch stream URL, set it, then play ──
+  const loadAndPlay = useCallback(async (song) => {
     if (!song) return;
     const videoId = song.youtubeId || song.videoId;
-    if (!videoId) return;
-
+    if (!videoId) {
+      console.error('[Player] No videoId found for song:', song);
+      return;
+    }
     setIsLoading(true);
-    setProgress(0);
-    setCurrentTime(0);
-    setDuration(0);
-
     try {
-      if (soundRef.current) {
-        await soundRef.current.unloadAsync();
-        soundRef.current = null;
-      }
-
-      const streamUrl = await getStreamUrl(videoId);
-      const { sound } = await Audio.Sound.createAsync(
-        { uri: streamUrl },
-        { shouldPlay, volume: isMuted ? 0 : volume },
-        (status) => {
-          if (!isMountedRef.current || !status.isLoaded) return;
-          setIsPlaying(status.isPlaying);
-          setIsLoading(status.isBuffering && !status.isPlaying);
-          if (status.durationMillis) {
-            const dur = status.durationMillis / 1000;
-            setDuration(dur);
-            const pos = (status.positionMillis || 0) / 1000;
-            setCurrentTime(pos);
-            setProgress(dur > 0 ? pos / dur : 0);
-          }
-          if (status.didJustFinish) {
-            nextSongFnRef.current?.();
-          }
-        }
-      );
-      soundRef.current = sound;
+      const url = await getStreamUrl(videoId);
+      console.log('[Player] Stream URL:', url);
+      // Replace source and play
+      await player.replace({ uri: url });
+      player.play();
       setIsLoading(false);
     } catch (err) {
       console.error('[Player] loadAndPlay error:', err);
       setIsLoading(false);
-      setIsPlaying(false);
     }
-  }, [volume, isMuted]);
+  }, [player]);
 
-  // Load song when currentSong changes
+  // Trigger load when currentSong changes
   useEffect(() => {
-    if (currentSong) {
-      loadAndPlay(currentSong, true);
-    } else {
-      soundRef.current?.unloadAsync();
-      soundRef.current = null;
-      setIsPlaying(false);
-      setProgress(0);
-      setCurrentTime(0);
-      setDuration(0);
+    if (currentSong && player) {
+      loadAndPlay(currentSong);
     }
   }, [currentSong]);
 
+  // ── playSong: set queue + kickoff ──
   const playSong = useCallback((song, newQueue = null, index = 0) => {
     if (newQueue) {
       const safeIndex = Math.max(0, Math.min(index, newQueue.length - 1));
@@ -145,21 +129,16 @@ export const PlayerProvider = ({ children }) => {
       setPlaybackIndex(nextOrder.indexOf(safeIndex));
     }
     setCurrentSong(song);
-    setIsPlaying(true);
   }, [isShuffle]);
 
-  const togglePlay = useCallback(async () => {
-    const sound = soundRef.current;
-    if (!sound || !currentSong) return;
-    try {
-      const status = await sound.getStatusAsync();
-      if (status.isPlaying) {
-        await sound.pauseAsync();
-      } else {
-        await sound.playAsync();
-      }
-    } catch {}
-  }, [currentSong]);
+  const togglePlay = useCallback(() => {
+    if (!player || !currentSong) return;
+    if (isPlaying) {
+      player.pause();
+    } else {
+      player.play();
+    }
+  }, [player, currentSong, isPlaying]);
 
   const nextSong = useCallback(() => {
     const q = queueRef.current;
@@ -174,8 +153,6 @@ export const PlayerProvider = ({ children }) => {
         setPlaybackIndex(0);
         setQueueIndex(firstQI);
         setCurrentSong(q[firstQI]);
-      } else {
-        setIsPlaying(false);
       }
       return;
     }
@@ -195,7 +172,7 @@ export const PlayerProvider = ({ children }) => {
     if (!q.length || !order.length) return;
 
     if (currentTime > 3) {
-      soundRef.current?.setPositionAsync(0);
+      player?.seekTo(0);
       return;
     }
     const prevPBI = idx > 0 ? idx - 1 : order.length - 1;
@@ -203,33 +180,26 @@ export const PlayerProvider = ({ children }) => {
     setPlaybackIndex(prevPBI);
     setQueueIndex(prevQI);
     setCurrentSong(q[prevQI]);
-  }, [currentTime]);
+  }, [currentTime, player]);
 
-  const seek = useCallback(async (fraction) => {
-    const sound = soundRef.current;
-    if (!sound || !duration) return;
-    const posMs = fraction * duration * 1000;
-    await sound.setPositionAsync(posMs);
-    setCurrentTime(fraction * duration);
-    setProgress(fraction);
-  }, [duration]);
+  const seek = useCallback((fraction) => {
+    if (!player || !duration) return;
+    const posMs = fraction * duration;
+    player.seekTo(posMs);
+  }, [player, duration]);
 
   const setVolume = useCallback(async (val) => {
     setVolumeState(val);
     await AsyncStorage.setItem('melodix_volume', String(val));
-    if (soundRef.current) {
-      await soundRef.current.setVolumeAsync(Math.max(0, Math.min(1, val)));
-    }
     setIsMuted(val <= 0);
-  }, []);
+    if (player) player.volume = val;
+  }, [player]);
 
-  const toggleMute = useCallback(async () => {
+  const toggleMute = useCallback(() => {
     const next = !isMuted;
     setIsMuted(next);
-    if (soundRef.current) {
-      await soundRef.current.setVolumeAsync(next ? 0 : volume);
-    }
-  }, [isMuted, volume]);
+    if (player) player.volume = next ? 0 : volume;
+  }, [isMuted, volume, player]);
 
   const toggleShuffle = useCallback(() => {
     if (!queue.length) { setIsShuffle((v) => !v); return; }
@@ -250,6 +220,14 @@ export const PlayerProvider = ({ children }) => {
 
   const toggleRepeat = useCallback(() =>
     setRepeatMode((m) => (m === 'none' ? 'all' : m === 'all' ? 'one' : 'none')), []);
+
+  // Handle repeat-one via effect
+  useEffect(() => {
+    if (status?.didJustFinish && repeatModeRef.current === 'one' && player) {
+      player.seekTo(0);
+      player.play();
+    }
+  }, [status?.didJustFinish]);
 
   const playQueueItem = useCallback((pbi) => {
     const q = queueRef.current;

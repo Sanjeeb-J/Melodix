@@ -13,7 +13,9 @@
     },
     "android": {
       "package": "com.sanjeeb.melodix",
-      "permissions": ["WAKE_LOCK"],
+      "permissions": [
+        "WAKE_LOCK"
+      ],
       "adaptiveIcon": {
         "backgroundColor": "#E6F4FE",
         "foregroundImage": "./assets/images/android-icon-foreground.png",
@@ -29,6 +31,7 @@
     },
     "plugins": [
       "expo-router",
+      "expo-audio",
       [
         "expo-splash-screen",
         {
@@ -40,7 +43,8 @@
             "backgroundColor": "#000000"
           }
         }
-      ]
+      ],
+      "expo-audio"
     ],
     "experiments": {
       "typedRoutes": true,
