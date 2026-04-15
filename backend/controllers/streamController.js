@@ -72,7 +72,7 @@ const streamAudio = async (req, res) => {
         
         const subprocess = ytdlpExec.exec(url, {
           output: '-',
-          format: 'bestaudio',
+          format: 'ba[ext=m4a]/ba', // Optimized for mobile-friendly containers
           noCheckCertificates: true,
           noWarnings: true,
           noPlaylist: true,
@@ -82,13 +82,18 @@ const streamAudio = async (req, res) => {
             'user-agent:Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
           ],
         }, {
-          stdio: ['ignore', 'pipe', 'ignore']
+          stdio: ['ignore', 'pipe', 'pipe']
         });
 
         const ff = spawn(FFMPEG_BIN, [
           "-hide_banner", "-loglevel", "error",
           "-i", "pipe:0", "-vn", "-acodec", "libmp3lame", "-ab", "128k", "-f", "mp3", "pipe:1"
         ]);
+
+        // Diagnostics: Log first data movement
+        subprocess.stdout.once("data", () => console.log(`[Stream] Engine 1 (yt-dlp) data flow started for ${videoId}`));
+        subprocess.stderr.on("data", (d) => console.log(`[Stream] yt-dlp stderr: ${d.toString().trim()}`));
+        subprocess.on("close", (code) => { if (code !== 0) console.warn(`[Stream] yt-dlp process exited with code ${code}`); });
 
         subprocess.stdout.pipe(ff.stdin);
         ff.stdout.pipe(res);
@@ -103,7 +108,7 @@ const streamAudio = async (req, res) => {
           } catch (e) {} 
         });
 
-        console.log(`[Stream] yt-dlp pipe initialized for ${videoId}`);
+        console.log(`[Stream] yt-dlp pipes initialized for ${videoId}`);
         return;
       } catch (ytdlpErr) {
         console.warn(`[Stream] yt-dlp fallback failed: ${ytdlpErr.message}`);
