@@ -7,6 +7,9 @@ const path = require("path");
 const { execSync } = require("child_process");
 require("dotenv").config();
 
+// Fix for ytdl-core update check 403 error
+process.env.YTDL_NO_UPDATE = "1";
+
 const authRoutes = require("./routes/authRoutes");
 const testRoutes = require("./routes/testRoutes");
 const playlistRoutes = require("./routes/playlistRoutes");
@@ -23,15 +26,12 @@ if (!fs.existsSync(BIN_DIR)) fs.mkdirSync(BIN_DIR);
 const autoDownloadBinaries = () => {
   console.log("[Setup] Checking for core binaries...");
   try {
-    // Check if yt-dlp is in path
     execSync("yt-dlp --version");
     console.log("[Setup] yt-dlp found in system path.");
   } catch (e) {
     console.log("[Setup] yt-dlp not found. Attempting to install via yt-dlp-exec...");
     try {
-      const ytExec = require("yt-dlp-exec");
-      // yt-dlp-exec handles binary management internally, 
-      // but we'll log it as a success for the strategy.
+      require("yt-dlp-exec");
       console.log("[Setup] yt-dlp-exec is ready to handle binary failover.");
     } catch (err) {
       console.error("[Setup] Critical: Failed to setup yt-dlp-exec failover.");
@@ -47,22 +47,21 @@ async function startServer() {
   try {
     const options = { 
       location: 'IN',
-      device_category: 'YTMUSIC' 
+      device_category: 'ANDROID_TESTSUITE' 
     };
 
-    // If cookies are provided in env, use them to bypass blocks
     if (process.env.YOUTUBE_COOKIE) {
-      console.log("[Stream] YOUTUBE_COOKIE found, initializing session with cookies...");
-      // Innertube can take a cookie string directly
+      console.log("[Stream] Initializing with cookies...");
       yt = await Innertube.create({ ...options, cookie: process.env.YOUTUBE_COOKIE });
     } else {
+      console.log("[Stream] Initializing GUEST session (no cookies)...");
       yt = await Innertube.create(options);
     }
     
     console.log(`[Stream] youtubei.js initialized as ${options.device_category} client`);
     app.set('yt', yt);
   } catch (err) {
-    console.error("[Stream] Failed to initialize youtubei.js (falling back to guest):", err.message);
+    console.error("[Stream] Failed to initialize youtubei.js (falling back):", err.message);
     try {
       yt = await Innertube.create();
       app.set('yt', yt);

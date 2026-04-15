@@ -4,13 +4,6 @@ const path = require("path");
 const os = require("os");
 const ffmpegStatic = require("ffmpeg-static");
 const ytdl = require("@distube/ytdl-core");
-
-const { spawn, execSync } = require("child_process");
-const fs = require("fs");
-const path = require("path");
-const os = require("os");
-const ffmpegStatic = require("ffmpeg-static");
-const ytdl = require("@distube/ytdl-core");
 const ytdlpExec = require("yt-dlp-exec");
 
 // Environment-aware binary paths (Docker-first)
@@ -72,19 +65,19 @@ const streamAudio = async (req, res) => {
     // ─── Engine 1: youtubei.js (Innertube) ─────────────
     if (yt) {
       try {
-        console.log(`[Stream] Target: ${videoId} (Engine: Innertube)`);
+        console.log(`[Stream] Target: ${videoId} (Engine: Innertube - No Cookies)`);
         const info = await yt.getInfo(videoId);
         
-        // Target highest quality audio only mp4/m4a
+        // Use a broader format selection for guests
         const format = info.chooseFormat({ 
           type: 'audio', 
           quality: 'best',
-          format: 'mp4' 
+          format: 'any' 
         });
 
-        if (!format) throw new Error("No suitable audio format found via Innertube");
+        if (!format) throw new Error("Format extraction failed - YouTube might be blocking this server's IP");
 
-        console.log(`[Stream] Selected format: ${format.mime_type} (${format.audio_sample_rate}Hz)`);
+        console.log(`[Stream] Found format: ${format.mime_type}`);
         const youtubeStream = await info.download(format);
         
         const ff = spawn(FFMPEG_BIN, [
@@ -96,7 +89,10 @@ const streamAudio = async (req, res) => {
         ff.stdout.pipe(res);
 
         ff.on("close", () => { if (!res.writableEnded) res.end(); });
-        youtubeStream.on("error", (e) => { console.error("[Stream] Innertube pipe err:", e.message); ff.stdin.end(); });
+        youtubeStream.on("error", (e) => { 
+          console.error("[Stream] Innertube pipe error:", e.message); 
+          ff.stdin.end(); 
+        });
         req.on("close", () => { try { youtubeStream.destroy(); ff.kill("SIGKILL"); } catch (e) {} });
         return;
       } catch (innertubeErr) {
@@ -106,21 +102,18 @@ const streamAudio = async (req, res) => {
 
     // ─── Engine 2: yt-dlp-exec (The heavy lifter) ───────────────────────────────────
     try {
-      console.log(`[Stream] Target: ${videoId} (Engine: yt-dlp)`);
+      console.log(`[Stream] Target: ${videoId} (Engine: yt-dlp - Guest Mode)`);
       
       const ytdlpOptions = {
         output: '-',
         format: 'bestaudio',
         noCheckCertificates: true,
         noWarnings: true,
-        addHeader: ['referer:youtube.com', 'user-agent:Mozilla/5.0'],
+        addHeader: [
+          'referer:https://www.youtube.com/',
+          'user-agent:Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
+        ],
       };
-
-      if (process.env.YOUTUBE_COOKIE) {
-        cookieFilePath = path.join(os.tmpdir(), `c_${Date.now()}.txt`);
-        fs.writeFileSync(cookieFilePath, process.env.YOUTUBE_COOKIE.replace(/\\n/g, "\n"));
-        ytdlpOptions.cookie = cookieFilePath;
-      }
 
       const stream = ytdlpExec.execStream(url, ytdlpOptions);
       const ff = spawn(FFMPEG_BIN, ["-i", "pipe:0", "-vn", "-f", "mp3", "pipe:1"]);
@@ -129,11 +122,7 @@ const streamAudio = async (req, res) => {
       stream.pipe(ff.stdin);
       ff.stdout.pipe(res);
 
-      ff.on("close", () => {
-        if (cookieFilePath && fs.existsSync(cookieFilePath)) fs.unlinkSync(cookieFilePath);
-        if (!res.writableEnded) res.end();
-      });
-
+      ff.on("close", () => { if (!res.writableEnded) res.end(); });
       req.on("close", () => { try { stream.kill(); ff.kill("SIGKILL"); } catch (e) {} });
       return;
     } catch (ytdlpErr) {
