@@ -106,12 +106,6 @@ export default function HomeScreen() {
                   <View style={styles.quickInfo}>
                     <Text style={styles.quickName} numberOfLines={1}>{p.name}</Text>
                   </View>
-                  <TouchableOpacity
-                    style={styles.quickPlayBtn}
-                    onPress={() => handlePlayAll(p)}
-                  >
-                    <MaterialIcons name="play-arrow" size={20} color="#000" />
-                  </TouchableOpacity>
                 </TouchableOpacity>
               );
             })}
@@ -155,12 +149,6 @@ export default function HomeScreen() {
                       <MaterialIcons name="library-music" size={28} color="rgba(255,255,255,0.6)" />
                     </LinearGradient>
                   )}
-                  <TouchableOpacity
-                    style={styles.cardPlayBtn}
-                    onPress={() => handlePlayAll(p)}
-                  >
-                    <MaterialIcons name="play-arrow" size={20} color="#000" />
-                  </TouchableOpacity>
                 </View>
                 <Text style={styles.cardName} numberOfLines={1}>{p.name}</Text>
                 <Text style={styles.cardSubs}>{p.songs?.length || 0} songs</Text>
@@ -194,10 +182,6 @@ const styles = StyleSheet.create({
   quickThumb: { width: 52, height: 52, alignItems: 'center', justifyContent: 'center' },
   quickInfo: { flex: 1, paddingHorizontal: 8 },
   quickName: { color: '#fff', fontSize: 12, fontWeight: '700' },
-  quickPlayBtn: {
-    width: 32, height: 32, borderRadius: 16, backgroundColor: '#1db954',
-    alignItems: 'center', justifyContent: 'center', marginRight: 8,
-  },
 
   // Playlist grid
   playlistGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 12 },
@@ -206,11 +190,6 @@ const styles = StyleSheet.create({
   cardCover: {
     width: '100%', aspectRatio: 1, borderRadius: 8,
     alignItems: 'center', justifyContent: 'center',
-  },
-  cardPlayBtn: {
-    position: 'absolute', bottom: 8, right: 8,
-    width: 36, height: 36, borderRadius: 18, backgroundColor: '#1db954',
-    alignItems: 'center', justifyContent: 'center', elevation: 4,
   },
   cardName: { color: '#fff', fontSize: 13, fontWeight: '700' },
   cardSubs: { color: '#737373', fontSize: 11, marginTop: 2 },
