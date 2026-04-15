@@ -3,7 +3,9 @@
 // All mutation functions (create, add, delete, update) invalidate the cache
 // so the next fetch always returns fresh data.
 
-const API_URL = `${import.meta.env.VITE_API_URL}/api/playlists`;
+import { apiRequest, getApiUrl } from "./api";
+
+const API_URL = "/api/playlists";
 
 const CACHE_KEY = "melodix_playlists_cache";
 const CACHE_TTL_MS = 5 * 60 * 1000; // 5 minutes
@@ -50,7 +52,7 @@ export const getPlaylists = async () => {
 
   let res;
   try {
-    res = await fetch(API_URL, {
+    res = await fetch(getApiUrl(API_URL), {
       headers: { Authorization: `Bearer ${token}` },
     });
   } catch (networkErr) {
@@ -79,7 +81,7 @@ export const createPlaylist = async (name, importUrl = "") => {
 
   invalidatePlaylistCache(); // ✅ Invalidate before mutating
 
-  const res = await fetch(API_URL, {
+  return apiRequest(API_URL, {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
@@ -87,12 +89,6 @@ export const createPlaylist = async (name, importUrl = "") => {
     },
     body: JSON.stringify({ name, importUrl }),
   });
-
-  if (!res.ok) {
-    const err = await res.json().catch(() => ({}));
-    throw new Error(err.message || "Failed to create playlist");
-  }
-  return res.json();
 };
 
 export const addSongFromYouTube = async (playlistId, song) => {
@@ -100,7 +96,7 @@ export const addSongFromYouTube = async (playlistId, song) => {
 
   invalidatePlaylistCache(); // ✅ Invalidate — playlist songs changed
 
-  const res = await fetch(`${API_URL}/${playlistId}/songs`, {
+  return apiRequest(`${API_URL}/${playlistId}/songs`, {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
@@ -108,13 +104,6 @@ export const addSongFromYouTube = async (playlistId, song) => {
     },
     body: JSON.stringify(song),
   });
-
-  if (!res.ok) {
-    const err = await res.json();
-    throw new Error(err.message || "Add song failed");
-  }
-
-  return res.json();
 };
 
 export const deleteSong = async (playlistId, songId) => {
@@ -122,13 +111,10 @@ export const deleteSong = async (playlistId, songId) => {
 
   invalidatePlaylistCache(); // ✅ Invalidate — song removed
 
-  const res = await fetch(`${API_URL}/${playlistId}/songs/${songId}`, {
+  return apiRequest(`${API_URL}/${playlistId}/songs/${songId}`, {
     method: "DELETE",
     headers: { Authorization: `Bearer ${token}` },
   });
-
-  if (!res.ok) throw new Error("Failed to delete song");
-  return res.json();
 };
 
 export const updateSong = async (playlistId, songId, data) => {
@@ -136,7 +122,7 @@ export const updateSong = async (playlistId, songId, data) => {
 
   invalidatePlaylistCache(); // ✅ Invalidate — song metadata changed
 
-  const res = await fetch(`${API_URL}/${playlistId}/songs/${songId}`, {
+  return apiRequest(`${API_URL}/${playlistId}/songs/${songId}`, {
     method: "PUT",
     headers: {
       "Content-Type": "application/json",
@@ -144,8 +130,6 @@ export const updateSong = async (playlistId, songId, data) => {
     },
     body: JSON.stringify(data),
   });
-
-  return res.json();
 };
 
 export const updatePlaylist = async (id, name) => {
@@ -153,7 +137,7 @@ export const updatePlaylist = async (id, name) => {
 
   invalidatePlaylistCache(); // ✅ Invalidate — playlist name changed
 
-  const res = await fetch(`${API_URL}/${id}`, {
+  return apiRequest(`${API_URL}/${id}`, {
     method: "PUT",
     headers: {
       "Content-Type": "application/json",
@@ -161,8 +145,6 @@ export const updatePlaylist = async (id, name) => {
     },
     body: JSON.stringify({ name }),
   });
-
-  return res.json();
 };
 
 export const deletePlaylist = async (id) => {
@@ -170,7 +152,7 @@ export const deletePlaylist = async (id) => {
 
   invalidatePlaylistCache(); // ✅ Invalidate — playlist removed
 
-  await fetch(`${API_URL}/${id}`, {
+  await apiRequest(`${API_URL}/${id}`, {
     method: "DELETE",
     headers: { Authorization: `Bearer ${token}` },
   });
@@ -182,10 +164,8 @@ export const markPlaylistPlayed = async (id) => {
   // No cache invalidation needed here — play order is cosmetic
   // and will refresh on next natural expiry
 
-  const res = await fetch(`${API_URL}/${id}/play`, {
+  return apiRequest(`${API_URL}/${id}/play`, {
     method: "PUT",
     headers: { Authorization: `Bearer ${token}` },
   });
-
-  return res.json();
 };

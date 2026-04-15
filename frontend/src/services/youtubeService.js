@@ -1,25 +1,20 @@
-const API_URL = `${import.meta.env.VITE_API_URL}/api/youtube`;
+import { apiRequest } from "./api";
+
+const API_URL = "/api/youtube";
 
 const authorizedFetch = async (url) => {
   const token = localStorage.getItem("token");
-
-  const res = await fetch(url, {
+  return apiRequest(url, {
     headers: {
       Authorization: `Bearer ${token}`,
     },
   });
-
-  if (!res.ok) {
-    const err = new Error(`Request failed (${res.status})`);
-    err.status = res.status;
-    throw err;
-  }
-
-  return res.json();
 };
 
 export const searchYouTube = async (query) => {
-  return authorizedFetch(`${API_URL}/search?query=${encodeURIComponent(query)}`);
+  return authorizedFetch(
+    `${API_URL}/search?query=${encodeURIComponent(query)}`
+  );
 };
 
 export const searchYouTubeMusic = async (query, type) => {

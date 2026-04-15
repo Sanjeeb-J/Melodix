@@ -1,49 +1,33 @@
-const API_URL = `${import.meta.env.VITE_API_URL}/api/auth`;
+import { apiRequest } from "./api";
+
+const API_URL = "/api/auth";
 
 export const registerUser = async (userData) => {
-  const res = await fetch(`${API_URL}/register`, {
+  return apiRequest(`${API_URL}/register`, {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
     },
     body: JSON.stringify(userData),
   });
-
-  return res.json();
 };
 
 export const loginUser = async (userData) => {
-  const res = await fetch(`${API_URL}/login`, {
+  return apiRequest(`${API_URL}/login`, {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
     },
     body: JSON.stringify(userData),
   });
-
-  const data = await res.json();
-
-  if (!res.ok) {
-    throw new Error(data.message || "Login failed");
-  }
-
-  return data;
 };
 
 export const forgotPassword = async (email, newPassword) => {
-  const res = await fetch(`${API_URL}/forgot-password`, {
+  return apiRequest(`${API_URL}/forgot-password`, {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
     },
     body: JSON.stringify({ email, newPassword }),
   });
-
-  const data = await res.json();
-
-  if (!res.ok) {
-    throw new Error(data.message || "Request failed");
-  }
-
-  return data;
 };
