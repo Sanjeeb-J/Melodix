@@ -5,6 +5,14 @@ const os = require("os");
 const ffmpegStatic = require("ffmpeg-static");
 const ytdl = require("@distube/ytdl-core");
 
+const { spawn, execSync } = require("child_process");
+const fs = require("fs");
+const path = require("path");
+const os = require("os");
+const ffmpegStatic = require("ffmpeg-static");
+const ytdl = require("@distube/ytdl-core");
+const ytdlpExec = require("yt-dlp-exec");
+
 // Environment-aware binary paths (Docker-first)
 const FFMPEG_BIN = process.env.FFMPEG_PATH || ffmpegStatic;
 const YTDLP_BIN = process.env.YTDLP_PATH || "yt-dlp";
@@ -14,36 +22,26 @@ console.log(`[Stream] Environment: ${process.env.NODE_ENV}, FFMPEG: ${FFMPEG_BIN
 
 let isYtdlpAvailable = false;
 try {
-  const version = execSync(`${YTDLP_BIN} --version`).toString().trim();
+  execSync(`${YTDLP_BIN} --version`);
   isYtdlpAvailable = true;
-  console.log(`[Stream] yt-dlp verified! Version: ${version}`);
+  console.log(`[Stream] yt-dlp verified via ${YTDLP_BIN}`);
 } catch (e) {
-  console.log(`[Stream] yt-dlp NOT detected at ${YTDLP_BIN}. Searching in path...`);
   try {
     execSync("yt-dlp --version");
     isYtdlpAvailable = true;
-    console.log("[Stream] yt-dlp found in system PATH");
+    console.log("[Stream] yt-dlp verified in system PATH");
   } catch (err) {
-    console.error("[Stream] yt-dlp binary missing. Ensure Docker build completed successfully.");
+    console.log("[Stream] Native yt-dlp missing, will use yt-dlp-exec for failovers.");
   }
 }
 
 // Helper to parse Netscape HTTP Cookie File into an array of cookie objects for ytdl-core agent
 const parseCookiesToObjects = (cookieText) => {
     if (!cookieText) return [];
-    
-    // Replace literal '\n' strings with real newlines just in case
     const normalizedText = cookieText.replace(/\\n/g, "\n");
-
-    // If it looks like a JSON array already, try parsing it
     if (normalizedText.trim().startsWith("[")) {
-        try {
-            return JSON.parse(normalizedText);
-        } catch (e) {
-            console.error("[Stream] Error parsing YOUTUBE_COOKIE as JSON:", e.message);
-        }
+        try { return JSON.parse(normalizedText); } catch (e) { console.error("[Stream] JSON cookie error:", e.message); }
     }
-
     const cookies = [];
     const lines = normalizedText.split("\n");
     for (const line of lines) {
@@ -51,12 +49,10 @@ const parseCookiesToObjects = (cookieText) => {
         const parts = line.split("\t");
         if (parts.length >= 7) {
             cookies.push({
-                domain: parts[0],
-                path: parts[2],
+                domain: parts[0], path: parts[2],
                 secure: parts[3].toUpperCase() === "TRUE",
                 expirationDate: parseInt(parts[4]),
-                name: parts[5],
-                value: parts[6].trim()
+                name: parts[5], value: parts[6].trim()
             });
         }
     }
@@ -69,72 +65,68 @@ const streamAudio = async (req, res) => {
   if (!videoId) return res.status(400).json({ message: "videoId is required" });
 
   const url = `https://www.youtube.com/watch?v=${videoId}`;
-  console.log(`[Stream] Request received for videoId: ${videoId}`);
-  
-  // Try to get the pre-initialized Innertube instance from the app context
   const yt = req.app.get('yt');
   let cookieFilePath = null;
 
   try {
-    // ─── Engine 1: youtubei.js (Innertube) - Primary & Most Stable ─────────────
+    // ─── Engine 1: youtubei.js (Innertube) ─────────────
     if (yt) {
       try {
-        console.log(`[Stream] Starting Innertube + ffmpeg pipe for ${videoId}`);
+        console.log(`[Stream] Target: ${videoId} (Engine: Innertube)`);
         const info = await yt.getInfo(videoId);
-        const format = info.chooseFormat({ type: 'audio', quality: 'best' });
-        const youtubeStream = await info.download(format);
         
-        const ffmpegArgs = [
-          "-hide_banner", "-loglevel", "error",
-          "-i", "pipe:0", "-vn", "-acodec", "libmp3lame", "-ab", "128k", "-f", "mp3", "pipe:1",
-        ];
-        
-        const ff = spawn(FFMPEG_BIN, ffmpegArgs);
-        res.writeHead(200, { 
-          "Content-Type": "audio/mpeg", 
-          "Cache-Control": "no-cache", 
-          "Transfer-Encoding": "chunked",
-          "Connection": "keep-alive"
+        // Target highest quality audio only mp4/m4a
+        const format = info.chooseFormat({ 
+          type: 'audio', 
+          quality: 'best',
+          format: 'mp4' 
         });
 
+        if (!format) throw new Error("No suitable audio format found via Innertube");
+
+        console.log(`[Stream] Selected format: ${format.mime_type} (${format.audio_sample_rate}Hz)`);
+        const youtubeStream = await info.download(format);
+        
+        const ff = spawn(FFMPEG_BIN, [
+          "-i", "pipe:0", "-vn", "-acodec", "libmp3lame", "-ab", "128k", "-f", "mp3", "pipe:1"
+        ]);
+        
+        res.writeHead(200, { "Content-Type": "audio/mpeg", "Transfer-Encoding": "chunked" });
         youtubeStream.pipe(ff.stdin);
         ff.stdout.pipe(res);
 
         ff.on("close", () => { if (!res.writableEnded) res.end(); });
-        youtubeStream.on("error", (err) => { 
-          console.error(`[Stream] Innertube stream error: ${err.message}`); 
-          ff.stdin.end(); 
-        });
-
-        req.on("close", () => {
-          try {
-            console.log(`[Stream] Client disconnected, killing Innertube pipe for ${videoId}`);
-            youtubeStream.destroy();
-            ff.kill("SIGKILL");
-          } catch (e) {}
-        });
-
-        return; // Success!
+        youtubeStream.on("error", (e) => { console.error("[Stream] Innertube pipe err:", e.message); ff.stdin.end(); });
+        req.on("close", () => { try { youtubeStream.destroy(); ff.kill("SIGKILL"); } catch (e) {} });
+        return;
       } catch (innertubeErr) {
-        console.error(`[Stream] Innertube failed, falling back: ${innertubeErr.message}`);
+        console.error(`[Stream] Innertube failed: ${innertubeErr.message}`);
       }
     }
 
-    // ─── Engine 2: yt-dlp - Powerful Backup ───────────────────────────────────
-    if (isYtdlpAvailable) {
-      console.log(`[Stream] Starting fallback: yt-dlp for ${videoId}`);
-      const ytdlArgs = [url, "-o", "-", "-q", "-f", "bestaudio[ext=m4a]/bestaudio", "--no-playlist"];
+    // ─── Engine 2: yt-dlp-exec (The heavy lifter) ───────────────────────────────────
+    try {
+      console.log(`[Stream] Target: ${videoId} (Engine: yt-dlp)`);
+      
+      const ytdlpOptions = {
+        output: '-',
+        format: 'bestaudio',
+        noCheckCertificates: true,
+        noWarnings: true,
+        addHeader: ['referer:youtube.com', 'user-agent:Mozilla/5.0'],
+      };
+
       if (process.env.YOUTUBE_COOKIE) {
-        cookieFilePath = path.join(os.tmpdir(), `cookie_${Date.now()}.txt`);
-        fs.writeFileSync(cookieFilePath, process.env.YOUTUBE_COOKIE);
-        ytdlArgs.push("--cookies", cookieFilePath);
+        cookieFilePath = path.join(os.tmpdir(), `c_${Date.now()}.txt`);
+        fs.writeFileSync(cookieFilePath, process.env.YOUTUBE_COOKIE.replace(/\\n/g, "\n"));
+        ytdlpOptions.cookie = cookieFilePath;
       }
 
-      const ytdlProcess = spawn(YTDLP_BIN, ytdlArgs);
+      const stream = ytdlpExec.execStream(url, ytdlpOptions);
       const ff = spawn(FFMPEG_BIN, ["-i", "pipe:0", "-vn", "-f", "mp3", "pipe:1"]);
       
       res.writeHead(200, { "Content-Type": "audio/mpeg" });
-      ytdlProcess.stdout.pipe(ff.stdin);
+      stream.pipe(ff.stdin);
       ff.stdout.pipe(res);
 
       ff.on("close", () => {
@@ -142,10 +134,10 @@ const streamAudio = async (req, res) => {
         if (!res.writableEnded) res.end();
       });
 
-      req.on("close", () => {
-        try { ytdlProcess.kill("SIGKILL"); ff.kill("SIGKILL"); } catch (e) {}
-      });
+      req.on("close", () => { try { stream.kill(); ff.kill("SIGKILL"); } catch (e) {} });
       return;
+    } catch (ytdlpErr) {
+      console.error(`[Stream] yt-dlp failed: ${ytdlpErr.message}`);
     }
 
     // ─── Engine 3: ytdl-core - Final Resort ──────────────────────────────────
