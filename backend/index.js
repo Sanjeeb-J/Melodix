@@ -41,7 +41,13 @@ const autoDownloadBinaries = () => {
 
 // Connect to DB then start server
 async function startServer() {
-  await connectDB();
+  try {
+    await connectDB();
+    console.log("[Setup] Database initialization complete.");
+  } catch (dbErr) {
+    console.error("[Setup] Database connection failed. Playlist features will be disabled.", dbErr.message);
+  }
+  
   autoDownloadBinaries();
   
   try {

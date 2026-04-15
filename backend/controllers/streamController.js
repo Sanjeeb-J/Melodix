@@ -66,15 +66,16 @@ const streamAudio = async (req, res) => {
 
   try {
     // ─── Engine 1: yt-dlp (Primary for Guests) ───────────────────
-    // yt-dlp is currently most resilient to guest blocks
     if (!hasCookies) {
       try {
-        console.log(`[Stream] Guest mode detected. Trying yt-dlp first for ${videoId}`);
+        console.log(`[Stream] Guest mode: trying yt-dlp first for ${videoId}`);
         const stream = ytdlpExec.execStream(url, {
           output: '-',
           format: 'bestaudio',
           noCheckCertificates: true,
           noWarnings: true,
+          noPlaylist: true,
+          quiet: true,
           addHeader: [
             'referer:https://www.youtube.com/',
             'user-agent:Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
@@ -98,7 +99,7 @@ const streamAudio = async (req, res) => {
       }
     }
 
-    // ─── Engine 2: youtubei.js (Primary for Auth / Fallback for Guest) ─────────────
+    // ─── Engine 2: youtubei.js (Secondary) ─────────────
     if (yt) {
       try {
         console.log(`[Stream] Trying youtubei.js for ${videoId}`);
