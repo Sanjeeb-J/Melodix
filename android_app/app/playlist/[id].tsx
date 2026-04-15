@@ -13,6 +13,7 @@ import {
 } from '../../services/playlistService';
 import { getPlaylistGradientColors } from '../../utils/playlistCover';
 import { fmtTime } from '../../context/PlayerContext';
+import MiniPlayer from '../../components/MiniPlayer';
 
 export default function PlaylistScreen() {
   const { id } = useLocalSearchParams();
@@ -286,6 +287,8 @@ export default function PlaylistScreen() {
           </View>
         </View>
       </Modal>
+
+      <MiniPlayer />
     </View>
   );
 }

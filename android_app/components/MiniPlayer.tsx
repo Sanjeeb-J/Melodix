@@ -5,9 +5,13 @@ import {
 } from 'react-native';
 import Slider from '@react-native-community/slider';
 import { MaterialIcons } from '@expo/vector-icons';
+import { usePathname } from 'expo-router';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { usePlayer, fmtTime } from '../context/PlayerContext';
 
 export default function MiniPlayer() {
+  const pathname = usePathname();
+  const isPlaylistRoute = pathname.includes('/playlist');
   const {
     currentSong, isPlaying, isLoading,
     progress, duration, currentTime,
@@ -17,6 +21,7 @@ export default function MiniPlayer() {
     setVolume, toggleMute, toggleShuffle, toggleRepeat, playQueueItem,
   } = usePlayer();
 
+  const insets = useSafeAreaInsets();
   const [expanded, setExpanded] = useState(false);
   const [showQueue, setShowQueue] = useState(false);
 
@@ -25,11 +30,16 @@ export default function MiniPlayer() {
   const RepeatIcon = repeatMode === 'one' ? 'repeat-one' : 'repeat';
   const VolumeIcon = isMuted || volume === 0 ? 'volume-off' : volume < 0.5 ? 'volume-down' : 'volume-up';
 
+  const dynamicBarStyles = [
+    styles.miniBar,
+    { bottom: isPlaylistRoute ? 0 : 60 }
+  ];
+
   return (
     <>
       {/* Mini Player Bar */}
       {!expanded && (
-        <TouchableOpacity style={styles.miniBar} onPress={() => setExpanded(true)} activeOpacity={0.9}>
+        <TouchableOpacity style={dynamicBarStyles} onPress={() => setExpanded(true)} activeOpacity={0.9}>
           <Image source={{ uri: currentSong.thumbnail }} style={styles.miniThumb} />
           <View style={styles.miniInfo}>
             <Text style={styles.miniTitle} numberOfLines={1}>{currentSong.name || currentSong.title}</Text>
@@ -57,80 +67,96 @@ export default function MiniPlayer() {
       )}
 
       {/* Full Player Modal */}
-      <Modal visible={expanded} animationType="slide" transparent>
-        <View style={styles.fullContainer}>
-          <View style={styles.fullInner}>
-            {/* Drag handle */}
-            <TouchableOpacity style={styles.dragHandle} onPress={() => setExpanded(false)}>
-              <View style={styles.dragBar} />
+      <Modal visible={expanded} animationType="slide" transparent={false} statusBarTranslucent>
+        <View style={[styles.fullContainer, { paddingTop: insets.top, paddingBottom: insets.bottom }]}>
+          {/* Header */}
+          <View style={styles.fullHeader}>
+            <TouchableOpacity onPress={() => setExpanded(false)} style={styles.dismissBtn}>
+              <MaterialIcons name="expand-more" size={32} color="#fff" />
             </TouchableOpacity>
+            <View style={styles.headerTextContainer}>
+              <Text style={styles.playingFrom}>PLAYING FROM PLAYLIST</Text>
+              <Text style={styles.playlistTitle} numberOfLines={1}>Melodix Mix</Text>
+            </View>
+            <TouchableOpacity onPress={() => setExpanded(false)} style={styles.moreBtn}>
+              <MaterialIcons name="more-vert" size={24} color="#fff" />
+            </TouchableOpacity>
+          </View>
 
-            {/* Cover */}
+          {/* Cover */}
+          <View style={styles.coverContainer}>
             <Image source={{ uri: currentSong.thumbnail }} style={styles.fullCover} />
+          </View>
 
-            {/* Song info */}
-            <View style={styles.fullInfo}>
-              <Text style={styles.fullTitle} numberOfLines={2}>{currentSong.name || currentSong.title}</Text>
+          {/* Song info */}
+          <View style={styles.fullInfoRow}>
+            <View style={styles.titleArtistContainer}>
+              <Text style={styles.fullTitle} numberOfLines={1}>{currentSong.name || currentSong.title}</Text>
               <Text style={styles.fullArtist} numberOfLines={1}>{currentSong.artist}</Text>
             </View>
+            <TouchableOpacity style={styles.favBtn}>
+              <MaterialIcons name="favorite-border" size={24} color="#fff" />
+            </TouchableOpacity>
+          </View>
 
-            {/* Progress slider */}
-            <View style={styles.progressRow}>
+          {/* Progress slider */}
+          <View style={styles.sliderContainer}>
+            <Slider
+              style={styles.fullSlider}
+              minimumValue={0}
+              maximumValue={1}
+              value={progress}
+              onSlidingComplete={(val) => seek(val)}
+              minimumTrackTintColor="#1db954"
+              maximumTrackTintColor="rgba(255,255,255,0.15)"
+              thumbTintColor="#1db954"
+            />
+            <View style={styles.timeRow}>
               <Text style={styles.timeText}>{fmtTime(currentTime)}</Text>
-              <Slider
-                style={styles.slider}
-                minimumValue={0}
-                maximumValue={1}
-                value={progress}
-                onSlidingComplete={(val) => seek(val)}
-                minimumTrackTintColor="#1db954"
-                maximumTrackTintColor="rgba(255,255,255,0.15)"
-                thumbTintColor="#1db954"
-              />
               <Text style={styles.timeText}>{fmtTime(duration)}</Text>
             </View>
+          </View>
 
-            {/* Controls */}
-            <View style={styles.controls}>
-              <TouchableOpacity style={styles.ctrlBtn} onPress={toggleShuffle}>
-                <MaterialIcons name="shuffle" size={22} color={isShuffle ? '#1db954' : '#737373'} />
-              </TouchableOpacity>
-              <TouchableOpacity style={styles.ctrlBtn} onPress={prevSong}>
-                <MaterialIcons name="skip-previous" size={36} color="#fff" />
-              </TouchableOpacity>
-              <TouchableOpacity style={styles.playBtn} onPress={togglePlay}>
-                <MaterialIcons
-                  name={isLoading ? 'hourglass-empty' : isPlaying ? 'pause' : 'play-arrow'}
-                  size={36} color="#000"
-                />
-              </TouchableOpacity>
-              <TouchableOpacity style={styles.ctrlBtn} onPress={nextSong}>
-                <MaterialIcons name="skip-next" size={36} color="#fff" />
-              </TouchableOpacity>
-              <TouchableOpacity style={styles.ctrlBtn} onPress={toggleRepeat}>
-                <MaterialIcons name={RepeatIcon} size={22} color={repeatMode !== 'none' ? '#1db954' : '#737373'} />
-              </TouchableOpacity>
-            </View>
-
-            {/* Volume + Queue */}
-            <View style={styles.secondaryRow}>
-              <TouchableOpacity onPress={toggleMute}>
-                <MaterialIcons name={VolumeIcon} size={22} color="#737373" />
-              </TouchableOpacity>
-              <Slider
-                style={{ flex: 1, marginHorizontal: 8 }}
-                minimumValue={0}
-                maximumValue={1}
-                value={isMuted ? 0 : volume}
-                onValueChange={(val) => setVolume(val)}
-                minimumTrackTintColor="#1db954"
-                maximumTrackTintColor="rgba(255,255,255,0.15)"
-                thumbTintColor="#fff"
+          {/* Controls */}
+          <View style={styles.controls}>
+            <TouchableOpacity style={styles.ctrlBtn} onPress={toggleShuffle}>
+              <MaterialIcons name="shuffle" size={22} color={isShuffle ? '#1db954' : '#737373'} />
+            </TouchableOpacity>
+            <TouchableOpacity style={styles.ctrlBtn} onPress={prevSong}>
+              <MaterialIcons name="skip-previous" size={42} color="#fff" />
+            </TouchableOpacity>
+            <TouchableOpacity style={styles.playBtn} onPress={togglePlay}>
+              <MaterialIcons
+                name={isLoading ? 'hourglass-empty' : isPlaying ? 'pause' : 'play-arrow'}
+                size={42} color="#000"
               />
-              <TouchableOpacity onPress={() => setShowQueue(true)}>
-                <MaterialIcons name="queue-music" size={22} color="#737373" />
-              </TouchableOpacity>
-            </View>
+            </TouchableOpacity>
+            <TouchableOpacity style={styles.ctrlBtn} onPress={nextSong}>
+              <MaterialIcons name="skip-next" size={42} color="#fff" />
+            </TouchableOpacity>
+            <TouchableOpacity style={styles.ctrlBtn} onPress={toggleRepeat}>
+              <MaterialIcons name={RepeatIcon} size={22} color={repeatMode !== 'none' ? '#1db954' : '#737373'} />
+            </TouchableOpacity>
+          </View>
+
+          {/* Footer Controls */}
+          <View style={styles.footerControls}>
+            <TouchableOpacity onPress={toggleMute}>
+              <MaterialIcons name={VolumeIcon} size={22} color="#737373" />
+            </TouchableOpacity>
+            <Slider
+              style={styles.volumeSlider}
+              minimumValue={0}
+              maximumValue={1}
+              value={isMuted ? 0 : volume}
+              onValueChange={(val) => setVolume(val)}
+              minimumTrackTintColor="#fff"
+              maximumTrackTintColor="rgba(255,255,255,0.15)"
+              thumbTintColor="#fff"
+            />
+            <TouchableOpacity onPress={() => setShowQueue(true)}>
+              <MaterialIcons name="queue-music" size={22} color="#737373" />
+            </TouchableOpacity>
           </View>
         </View>
       </Modal>
@@ -201,30 +227,40 @@ const styles = StyleSheet.create({
   miniProgressFill: { height: 2, backgroundColor: '#1db954' },
 
   // Full player
-  fullContainer: { flex: 1, backgroundColor: 'rgba(0,0,0,0.95)', justifyContent: 'flex-end' },
-  fullInner: {
-    backgroundColor: '#181818', borderTopLeftRadius: 24, borderTopRightRadius: 24,
-    padding: 24, paddingBottom: 40, alignItems: 'center',
+  fullContainer: { flex: 1, backgroundColor: '#121212', paddingHorizontal: 24 },
+  fullHeader: {
+    height: 64, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
+    marginBottom: 20,
   },
-  dragHandle: { width: '100%', alignItems: 'center', paddingBottom: 16 },
-  dragBar: { width: 36, height: 4, borderRadius: 2, backgroundColor: 'rgba(255,255,255,0.2)' },
-  fullCover: { width: 260, height: 260, borderRadius: 16, marginBottom: 24, elevation: 8 },
-  fullInfo: { width: '100%', alignItems: 'center', marginBottom: 20 },
-  fullTitle: { color: '#fff', fontSize: 22, fontWeight: '900', textAlign: 'center' },
-  fullArtist: { color: '#737373', fontSize: 15, marginTop: 4 },
+  dismissBtn: { padding: 8, marginLeft: -12 },
+  headerTextContainer: { alignItems: 'center' },
+  playingFrom: { color: '#a7a7a7', fontSize: 11, fontWeight: '700', letterSpacing: 1 },
+  playlistTitle: { color: '#fff', fontSize: 13, fontWeight: '700', marginTop: 2 },
+  moreBtn: { padding: 8, marginRight: -12 },
 
-  progressRow: { flexDirection: 'row', alignItems: 'center', width: '100%', gap: 8, marginBottom: 16 },
-  timeText: { color: '#737373', fontSize: 11, fontFamily: 'monospace', minWidth: 34 },
-  slider: { flex: 1, height: 40 },
+  coverContainer: { flex: 1, justifyContent: 'center', alignItems: 'center', marginBottom: 20 },
+  fullCover: { width: '100%', aspectRatio: 1, borderRadius: 12, elevation: 20 },
 
-  controls: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 16, marginBottom: 20, width: '100%' },
-  ctrlBtn: { padding: 8 },
+  fullInfoRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 24 },
+  titleArtistContainer: { flex: 1, marginRight: 16 },
+  fullTitle: { color: '#fff', fontSize: 24, fontWeight: '900' },
+  fullArtist: { color: '#a7a7a7', fontSize: 16, marginTop: 4, fontWeight: '600' },
+  favBtn: { padding: 4 },
+
+  sliderContainer: { width: '100%', marginBottom: 24 },
+  fullSlider: { width: '100%', height: 4, marginVertical: 10 },
+  timeRow: { flexDirection: 'row', justifyContent: 'space-between' },
+  timeText: { color: '#a7a7a7', fontSize: 12, fontWeight: '500' },
+
+  controls: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 32 },
+  ctrlBtn: { padding: 4 },
   playBtn: {
-    width: 64, height: 64, borderRadius: 32, backgroundColor: '#1db954',
-    alignItems: 'center', justifyContent: 'center', elevation: 4,
+    width: 72, height: 72, borderRadius: 36, backgroundColor: '#fff',
+    alignItems: 'center', justifyContent: 'center',
   },
 
-  secondaryRow: { flexDirection: 'row', alignItems: 'center', width: '100%', gap: 8 },
+  footerControls: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingBottom: 16 },
+  volumeSlider: { flex: 1, marginHorizontal: 16 },
 
   // Queue
   queueOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.5)' },

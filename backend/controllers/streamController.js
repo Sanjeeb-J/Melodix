@@ -62,6 +62,7 @@ const streamAudio = async (req, res) => {
   if (!videoId) return res.status(400).json({ message: "videoId is required" });
 
   const url = `https://www.youtube.com/watch?v=${videoId}`;
+  console.log(`[Stream] Request received for videoId: ${videoId}`);
   let cookieFilePath = null;
 
   try {
@@ -112,7 +113,10 @@ const streamAudio = async (req, res) => {
       ff.stderr.on("data", (data) => console.log(`[Stream] ffmpeg stderr: ${data}`));
 
       ytdlProcess.on("error", (err) => {
-          console.error(`[Stream] yt-dlp error: ${err.message}`);
+          console.error(`[Stream] yt-dlp process error: ${err.message}`);
+          if (!res.headersSent) {
+            res.status(500).json({ message: "yt-dlp failed to start", error: err.message });
+          }
           ff.stdin.end();
       });
 
@@ -165,6 +169,7 @@ const streamAudio = async (req, res) => {
 
       req.on("close", () => {
         try {
+            console.log(`[Stream] Client disconnected, killing ytdl-core fallback for ${videoId}`);
             ytdlStream.destroy();
             ff.kill("SIGKILL");
         } catch (e) {}
@@ -172,10 +177,14 @@ const streamAudio = async (req, res) => {
     }
 
   } catch (err) {
-    console.error(`[Stream] Fatal error: ${err.message}`);
+    console.error(`[Stream] Fatal controller error: ${err.message}`);
     if (cookieFilePath && fs.existsSync(cookieFilePath)) fs.unlinkSync(cookieFilePath);
     if (!res.headersSent) {
-      res.status(500).json({ message: "Failed to fetch audio stream", error: err.message });
+      const isBlocked = err.message.includes("403") || err.message.includes("Sign in");
+      res.status(isBlocked ? 403 : 500).json({ 
+        message: isBlocked ? "YouTube blocked this request (likely IP cap)" : "Failed to fetch audio stream", 
+        error: err.message 
+      });
     } else {
       res.end();
     }
