@@ -68,33 +68,45 @@ const streamAudio = async (req, res) => {
     // ─── Engine 1: yt-dlp (Primary for Guests) ───────────────────
     if (!hasCookies) {
       try {
-        console.log(`[Stream] Guest mode: trying direct yt-dlp first for ${videoId}`);
-        const streamProc = spawn(YTDLP_BIN, [
-          "-o", "-",
-          "--format", "bestaudio",
-          "--no-playlist",
-          "--quiet",
-          "--no-warnings",
-          "--add-header", "referer:https://www.youtube.com/",
-          "--add-header", "user-agent:Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
-          url
-        ]);
+        console.log(`[Stream] Guest mode: trying optimized yt-dlp-exec for ${videoId}`);
+        
+        const subprocess = ytdlpExec.exec(url, {
+          output: '-',
+          format: 'bestaudio',
+          noCheckCertificates: true,
+          noWarnings: true,
+          noPlaylist: true,
+          quiet: true,
+          addHeader: [
+            'referer:https://www.youtube.com/',
+            'user-agent:Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
+          ],
+        }, {
+          stdio: ['ignore', 'pipe', 'ignore']
+        });
 
         const ff = spawn(FFMPEG_BIN, [
           "-hide_banner", "-loglevel", "error",
           "-i", "pipe:0", "-vn", "-acodec", "libmp3lame", "-ab", "128k", "-f", "mp3", "pipe:1"
         ]);
 
-        streamProc.stdout.pipe(ff.stdin);
+        subprocess.stdout.pipe(ff.stdin);
         ff.stdout.pipe(res);
 
         ff.on("close", () => { if (!res.writableEnded) res.end(); });
-        streamProc.on("error", (e) => { console.error("[Stream] yt-dlp process error:", e.message); });
-        req.on("close", () => { try { streamProc.kill("SIGKILL"); ff.kill("SIGKILL"); } catch (e) {} });
+        subprocess.on("error", (e) => { console.error("[Stream] yt-dlp process error:", e.message); });
+        
+        req.on("close", () => { 
+          try { 
+            subprocess.kill(); 
+            ff.kill("SIGKILL"); 
+          } catch (e) {} 
+        });
+
         console.log(`[Stream] yt-dlp pipe initialized for ${videoId}`);
         return;
       } catch (ytdlpErr) {
-        console.warn(`[Stream] yt-dlp failed: ${ytdlpErr.message}`);
+        console.warn(`[Stream] yt-dlp fallback failed: ${ytdlpErr.message}`);
       }
     }
 
