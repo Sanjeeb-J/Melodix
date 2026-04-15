@@ -7,18 +7,32 @@ import { apiRequest, getApiUrl } from "./api";
 
 const API_URL = "/api/playlists";
 
-const CACHE_KEY = "melodix_playlists_cache";
+const CACHE_KEY_PREFIX = "melodix_playlists_cache";
+const LEGACY_CACHE_KEY = "melodix_playlists_cache";
 const CACHE_TTL_MS = 5 * 60 * 1000; // 5 minutes
 
 // ─── Cache helpers ────────────────────────────────────────────────────────────
 
-const getCachedPlaylists = () => {
+const getCacheKey = (token) => {
+  if (!token) return null;
+  return `${CACHE_KEY_PREFIX}:${token}`;
+};
+
+const clearLegacyPlaylistCache = () => {
+  localStorage.removeItem(LEGACY_CACHE_KEY);
+};
+
+const getCachedPlaylists = (token) => {
   try {
-    const raw = localStorage.getItem(CACHE_KEY);
+    clearLegacyPlaylistCache();
+    const cacheKey = getCacheKey(token);
+    if (!cacheKey) return null;
+
+    const raw = localStorage.getItem(cacheKey);
     if (!raw) return null;
     const { data, timestamp } = JSON.parse(raw);
     if (Date.now() - timestamp > CACHE_TTL_MS) {
-      localStorage.removeItem(CACHE_KEY);
+      localStorage.removeItem(cacheKey);
       return null;
     }
     return data;
@@ -27,16 +41,25 @@ const getCachedPlaylists = () => {
   }
 };
 
-const setCachedPlaylists = (data) => {
+const setCachedPlaylists = (token, data) => {
   try {
-    localStorage.setItem(CACHE_KEY, JSON.stringify({ data, timestamp: Date.now() }));
+    const cacheKey = getCacheKey(token);
+    if (!cacheKey) return;
+
+    clearLegacyPlaylistCache();
+    localStorage.setItem(cacheKey, JSON.stringify({ data, timestamp: Date.now() }));
   } catch {
     // localStorage might be full — fail silently
   }
 };
 
 const invalidatePlaylistCache = () => {
-  localStorage.removeItem(CACHE_KEY);
+  const token = localStorage.getItem("token");
+  const cacheKey = getCacheKey(token);
+  if (cacheKey) {
+    localStorage.removeItem(cacheKey);
+  }
+  clearLegacyPlaylistCache();
 };
 
 // ─── API functions ────────────────────────────────────────────────────────────
@@ -45,7 +68,7 @@ export const getPlaylists = async () => {
   const token = localStorage.getItem("token");
 
   // ✅ Serve from cache if fresh
-  const cached = getCachedPlaylists();
+  const cached = getCachedPlaylists(token);
   if (cached) {
     return cached;
   }
@@ -71,7 +94,7 @@ export const getPlaylists = async () => {
   const data = await res.json();
 
   // ✅ Cache the fresh result
-  setCachedPlaylists(data);
+  setCachedPlaylists(token, data);
 
   return data;
 };

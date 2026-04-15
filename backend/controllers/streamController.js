@@ -93,15 +93,23 @@ const streamAudio = async (req, res) => {
       ];
       
       const ff = spawn(FFMPEG_BIN, ffmpegArgs);
+      res.writeHead(200, { 
+        "Content-Type": "audio/mpeg", 
+        "Cache-Control": "no-cache", 
+        "Transfer-Encoding": "chunked",
+        "Connection": "keep-alive"
+      });
+
       ytdlProcess.stdout.pipe(ff.stdin);
       ff.stdout.pipe(res);
-
-      res.writeHead(200, { "Content-Type": "audio/mpeg", "Cache-Control": "no-cache", "Transfer-Encoding": "chunked" });
 
       ff.on("close", (code) => {
         if (cookieFilePath && fs.existsSync(cookieFilePath)) fs.unlinkSync(cookieFilePath);
         if (!res.writableEnded) res.end();
       });
+
+      ytdlProcess.stderr.on("data", (data) => console.log(`[Stream] yt-dlp stderr: ${data}`));
+      ff.stderr.on("data", (data) => console.log(`[Stream] ffmpeg stderr: ${data}`));
 
       ytdlProcess.on("error", (err) => {
           console.error(`[Stream] yt-dlp error: ${err.message}`);
@@ -141,13 +149,19 @@ const streamAudio = async (req, res) => {
       ];
       
       const ff = spawn(FFMPEG_BIN, ffmpegArgs);
+      res.writeHead(200, { 
+        "Content-Type": "audio/mpeg", 
+        "Cache-Control": "no-cache", 
+        "Transfer-Encoding": "chunked",
+        "Connection": "keep-alive"
+      });
+
       ytdlStream.pipe(ff.stdin);
       ff.stdout.pipe(res);
 
-      res.writeHead(200, { "Content-Type": "audio/mpeg", "Cache-Control": "no-cache", "Transfer-Encoding": "chunked" });
-
       ff.on("close", () => { if (!res.writableEnded) res.end(); });
       ytdlStream.on("error", (err) => { console.error(`[Stream] ytdl-core error: ${err.message}`); ff.stdin.end(); });
+      ff.stderr.on("data", (data) => console.log(`[Stream] ffmpeg-fallback stderr: ${data}`));
 
       req.on("close", () => {
         try {
