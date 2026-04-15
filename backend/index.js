@@ -19,9 +19,12 @@ async function startServer() {
   await connectDB();
   
   try {
-    yt = await Innertube.create();
-    console.log("[Stream] youtubei.js (Innertube) initialized");
-    app.set('yt', yt); // Make it available via app.get('yt')
+    yt = await Innertube.create({ 
+      location: 'IN', // Optional: Lock to India to match user context
+      device_category: 'ANDROID' 
+    });
+    console.log("[Stream] youtubei.js (Innertube) initialized as ANDROID client");
+    app.set('yt', yt);
   } catch (err) {
     console.error("[Stream] Failed to initialize youtubei.js:", err.message);
   }

@@ -5,20 +5,27 @@ const os = require("os");
 const ffmpegStatic = require("ffmpeg-static");
 const ytdl = require("@distube/ytdl-core");
 
-// Use system ffmpeg on Railway/Docker, else fallback to ffmpeg-static for local
-const FFMPEG_BIN = process.env.FFMPEG_PATH || (process.env.RAILWAY_STATIC_URL ? "ffmpeg" : ffmpegStatic);
-// Use system yt-dlp
-const YTDLP_BIN = "yt-dlp";
+// Environment-aware binary paths (Docker-first)
+const FFMPEG_BIN = process.env.FFMPEG_PATH || ffmpegStatic;
+const YTDLP_BIN = process.env.YTDLP_PATH || "yt-dlp";
 
-// Check if yt-dlp is available in the system path
+// Log detected environment
+console.log(`[Stream] Environment: ${process.env.NODE_ENV}, FFMPEG: ${FFMPEG_BIN}, YT-DLP: ${YTDLP_BIN}`);
+
 let isYtdlpAvailable = false;
 try {
   const version = execSync(`${YTDLP_BIN} --version`).toString().trim();
   isYtdlpAvailable = true;
-  console.log(`[Stream] yt-dlp detected! Version: ${version}`);
+  console.log(`[Stream] yt-dlp verified! Version: ${version}`);
 } catch (e) {
-  console.log("[Stream] yt-dlp NOT found in system path. Fallback to ytdl-core.");
-  console.log(`[Stream] Debug: ${e.message}`);
+  console.log(`[Stream] yt-dlp NOT detected at ${YTDLP_BIN}. Searching in path...`);
+  try {
+    execSync("yt-dlp --version");
+    isYtdlpAvailable = true;
+    console.log("[Stream] yt-dlp found in system PATH");
+  } catch (err) {
+    console.error("[Stream] yt-dlp binary missing. Ensure Docker build completed successfully.");
+  }
 }
 
 // Helper to parse Netscape HTTP Cookie File into an array of cookie objects for ytdl-core agent
