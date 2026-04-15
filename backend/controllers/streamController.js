@@ -63,22 +63,60 @@ const streamAudio = async (req, res) => {
 
   const url = `https://www.youtube.com/watch?v=${videoId}`;
   console.log(`[Stream] Request received for videoId: ${videoId}`);
+  
+  // Try to get the pre-initialized Innertube instance from the app context
+  const yt = req.app.get('yt');
   let cookieFilePath = null;
 
   try {
-    // Determine which engine to use
-    if (isYtdlpAvailable) {
-      console.log(`[Stream] Starting yt-dlp + ffmpeg pipe for ${videoId}`);
-      
-      const ytdlArgs = [
-        url,
-        "-o", "-",
-        "-q",
-        "-f", "bestaudio[ext=m4a]/bestaudio",
-        "--no-playlist",
-      ];
+    // ─── Engine 1: youtubei.js (Innertube) - Primary & Most Stable ─────────────
+    if (yt) {
+      try {
+        console.log(`[Stream] Starting Innertube + ffmpeg pipe for ${videoId}`);
+        const info = await yt.getInfo(videoId);
+        const format = info.chooseFormat({ type: 'audio', quality: 'best' });
+        const youtubeStream = await info.download(format);
+        
+        const ffmpegArgs = [
+          "-hide_banner", "-loglevel", "error",
+          "-i", "pipe:0", "-vn", "-acodec", "libmp3lame", "-ab", "128k", "-f", "mp3", "pipe:1",
+        ];
+        
+        const ff = spawn(FFMPEG_BIN, ffmpegArgs);
+        res.writeHead(200, { 
+          "Content-Type": "audio/mpeg", 
+          "Cache-Control": "no-cache", 
+          "Transfer-Encoding": "chunked",
+          "Connection": "keep-alive"
+        });
 
-      // Add cookies if available
+        youtubeStream.pipe(ff.stdin);
+        ff.stdout.pipe(res);
+
+        ff.on("close", () => { if (!res.writableEnded) res.end(); });
+        youtubeStream.on("error", (err) => { 
+          console.error(`[Stream] Innertube stream error: ${err.message}`); 
+          ff.stdin.end(); 
+        });
+
+        req.on("close", () => {
+          try {
+            console.log(`[Stream] Client disconnected, killing Innertube pipe for ${videoId}`);
+            youtubeStream.destroy();
+            ff.kill("SIGKILL");
+          } catch (e) {}
+        });
+
+        return; // Success!
+      } catch (innertubeErr) {
+        console.error(`[Stream] Innertube failed, falling back: ${innertubeErr.message}`);
+      }
+    }
+
+    // ─── Engine 2: yt-dlp - Powerful Backup ───────────────────────────────────
+    if (isYtdlpAvailable) {
+      console.log(`[Stream] Starting fallback: yt-dlp for ${videoId}`);
+      const ytdlArgs = [url, "-o", "-", "-q", "-f", "bestaudio[ext=m4a]/bestaudio", "--no-playlist"];
       if (process.env.YOUTUBE_COOKIE) {
         cookieFilePath = path.join(os.tmpdir(), `cookie_${Date.now()}.txt`);
         fs.writeFileSync(cookieFilePath, process.env.YOUTUBE_COOKIE);
@@ -86,109 +124,74 @@ const streamAudio = async (req, res) => {
       }
 
       const ytdlProcess = spawn(YTDLP_BIN, ytdlArgs);
+      const ff = spawn(FFMPEG_BIN, ["-i", "pipe:0", "-vn", "-f", "mp3", "pipe:1"]);
       
-      const ffmpegArgs = [
-        "-hide_banner", "-loglevel", "error",
-        "-i", "pipe:0",
-        "-vn", "-acodec", "libmp3lame", "-ab", "128k", "-f", "mp3", "pipe:1",
-      ];
-      
-      const ff = spawn(FFMPEG_BIN, ffmpegArgs);
-      res.writeHead(200, { 
-        "Content-Type": "audio/mpeg", 
-        "Cache-Control": "no-cache", 
-        "Transfer-Encoding": "chunked",
-        "Connection": "keep-alive"
-      });
-
+      res.writeHead(200, { "Content-Type": "audio/mpeg" });
       ytdlProcess.stdout.pipe(ff.stdin);
       ff.stdout.pipe(res);
 
-      ff.on("close", (code) => {
+      ff.on("close", () => {
         if (cookieFilePath && fs.existsSync(cookieFilePath)) fs.unlinkSync(cookieFilePath);
         if (!res.writableEnded) res.end();
       });
 
-      ytdlProcess.stderr.on("data", (data) => console.log(`[Stream] yt-dlp stderr: ${data}`));
-      ff.stderr.on("data", (data) => console.log(`[Stream] ffmpeg stderr: ${data}`));
-
-      ytdlProcess.on("error", (err) => {
-          console.error(`[Stream] yt-dlp process error: ${err.message}`);
-          if (!res.headersSent) {
-            res.status(500).json({ message: "yt-dlp failed to start", error: err.message });
-          }
-          ff.stdin.end();
-      });
-
       req.on("close", () => {
-        try {
-          ytdlProcess.kill("SIGKILL");
-          ff.kill("SIGKILL");
-        } catch (e) {}
+        try { ytdlProcess.kill("SIGKILL"); ff.kill("SIGKILL"); } catch (e) {}
       });
-
-    } else {
-      // Fallback to ytdl-core
-      console.log(`[Stream] Starting ytdl-core + ffmpeg pipe for ${videoId}`);
-      let agent;
-      if (process.env.YOUTUBE_COOKIE) {
-          try {
-              const cookies = parseCookiesToObjects(process.env.YOUTUBE_COOKIE);
-              if (cookies.length > 0) {
-                  agent = ytdl.createAgent(cookies);
-              }
-          } catch (e) {
-              console.error("[Stream] Failed to create ytdl agent:", e.message);
-          }
-      }
-
-      const options = { filter: "audioonly", quality: "highestaudio", highWaterMark: 1 << 25 };
-      if (agent) options.agent = agent;
-
-      const ytdlStream = ytdl(url, options);
-
-      const ffmpegArgs = [
-        "-hide_banner", "-loglevel", "error",
-        "-i", "pipe:0", "-vn", "-acodec", "libmp3lame", "-ab", "128k", "-f", "mp3", "pipe:1",
-      ];
-      
-      const ff = spawn(FFMPEG_BIN, ffmpegArgs);
-      res.writeHead(200, { 
-        "Content-Type": "audio/mpeg", 
-        "Cache-Control": "no-cache", 
-        "Transfer-Encoding": "chunked",
-        "Connection": "keep-alive"
-      });
-
-      ytdlStream.pipe(ff.stdin);
-      ff.stdout.pipe(res);
-
-      ff.on("close", () => { if (!res.writableEnded) res.end(); });
-      ytdlStream.on("error", (err) => { console.error(`[Stream] ytdl-core error: ${err.message}`); ff.stdin.end(); });
-      ff.stderr.on("data", (data) => console.log(`[Stream] ffmpeg-fallback stderr: ${data}`));
-
-      req.on("close", () => {
-        try {
-            console.log(`[Stream] Client disconnected, killing ytdl-core fallback for ${videoId}`);
-            ytdlStream.destroy();
-            ff.kill("SIGKILL");
-        } catch (e) {}
-      });
+      return;
     }
+
+    // ─── Engine 3: ytdl-core - Final Resort ──────────────────────────────────
+    console.log(`[Stream] Starting last resort: ytdl-core for ${videoId}`);
+    const options = { filter: "audioonly", quality: "highestaudio" };
+    if (process.env.YOUTUBE_COOKIE) {
+      const cookies = parseCookiesToObjects(process.env.YOUTUBE_COOKIE);
+      if (cookies.length > 0) options.agent = ytdl.createAgent(cookies);
+    }
+
+    const ytdlStream = ytdl(url, options);
+    const ff = spawn(FFMPEG_BIN, ["-i", "pipe:0", "-vn", "-f", "mp3", "pipe:1"]);
+    res.writeHead(200, { "Content-Type": "audio/mpeg" });
+    ytdlStream.pipe(ff.stdin);
+    ff.stdout.pipe(res);
+
+    ff.on("close", () => { if (!res.writableEnded) res.end(); });
+    req.on("close", () => { try { ytdlStream.destroy(); ff.kill("SIGKILL"); } catch (e) {} });
 
   } catch (err) {
     console.error(`[Stream] Fatal controller error: ${err.message}`);
     if (cookieFilePath && fs.existsSync(cookieFilePath)) fs.unlinkSync(cookieFilePath);
     if (!res.headersSent) {
-      const isBlocked = err.message.includes("403") || err.message.includes("Sign in");
-      res.status(isBlocked ? 403 : 500).json({ 
-        message: isBlocked ? "YouTube blocked this request (likely IP cap)" : "Failed to fetch audio stream", 
-        error: err.message 
-      });
+      res.status(500).json({ message: "Failed to stream audio after all attempts", error: err.message });
     } else {
       res.end();
     }
   }
 };
 
-module.exports = { streamAudio };
+const debugStream = async (req, res) => {
+  const { videoId } = req.params;
+  const yt = req.app.get('yt');
+  const results = {
+    videoId,
+    innertubeAvailable: !!yt,
+    isYtdlpAvailable,
+    log: []
+  };
+
+  try {
+    results.log.push("Checking Innertube...");
+    if (yt) {
+      const info = await yt.getInfo(videoId);
+      results.innertubeTitle = info.basic_info.title;
+      results.log.push("Innertube test successful");
+    } else {
+      results.log.push("Innertube NOT initialized in app context");
+    }
+    res.json(results);
+  } catch (err) {
+    res.status(500).json({ error: err.message, log: results.log });
+  }
+};
+
+module.exports = { streamAudio, debugStream };

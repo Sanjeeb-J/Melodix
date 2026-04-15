@@ -1,6 +1,7 @@
 const express = require("express");
 const cors = require("cors");
 const connectDB = require("./config/db");
+const { Innertube } = require("youtubei.js");
 require("dotenv").config();
 
 const authRoutes = require("./routes/authRoutes");
@@ -11,9 +12,19 @@ const streamRoutes = require("./routes/streamRoutes");
 
 const app = express();
 
+let yt;
+
 // Connect to DB then start server
 async function startServer() {
-  await connectDB(); // ensure DB connects before accepting requests
+  await connectDB();
+  
+  try {
+    yt = await Innertube.create();
+    console.log("[Stream] youtubei.js (Innertube) initialized");
+    app.set('yt', yt); // Make it available via app.get('yt')
+  } catch (err) {
+    console.error("[Stream] Failed to initialize youtubei.js:", err.message);
+  }
 
 const corsOptions = {
   origin: "*",

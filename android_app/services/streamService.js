@@ -12,6 +12,7 @@ export const getStreamSource = async (videoId) => {
   const baseUrl = getStreamUrl(videoId);
 
   if (Platform.OS === 'web') {
+    if (!token) console.warn('[Stream] No token found in AsyncStorage. Stream request might fail auth.');
     return {
       uri: token ? `${baseUrl}?token=${encodeURIComponent(token)}` : baseUrl,
     };
