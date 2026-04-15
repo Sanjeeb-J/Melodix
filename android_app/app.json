@@ -1,12 +1,12 @@
 {
   "expo": {
-    "name": "android_app",
-    "slug": "android_app",
+    "name": "Melodix",
+    "slug": "melodix-android",
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/images/icon.png",
-    "scheme": "androidapp",
-    "userInterfaceStyle": "automatic",
+    "scheme": "melodix",
+    "userInterfaceStyle": "dark",
     "newArchEnabled": true,
     "ios": {
       "supportsTablet": true

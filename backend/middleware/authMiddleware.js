@@ -25,10 +25,13 @@ const protect = async (req, res, next) => {
     
     // Attempt to load the user, but don't fail if the database is down
     try {
-      req.user = await User.findById(decoded.id).select("-password");
+      const user = await User.findById(decoded.id).select("-password");
+      req.user = user || { _id: decoded.id, id: decoded.id };
     } catch (dbError) {
-      console.warn("[Auth] Database error during user lookup — proceeding with token data only.");
-      req.user = { id: decoded.id, name: "Guest User" }; // Minimal user object to support streaming
+      console.warn("[Auth] Database error during user lookup - proceeding with token data only.");
+      // Preserve the authenticated user id so playlist ownership stays scoped
+      // even if the user document lookup fails temporarily.
+      req.user = { _id: decoded.id, id: decoded.id, name: "Guest User" };
     }
     
     next();
