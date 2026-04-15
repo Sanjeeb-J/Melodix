@@ -3,7 +3,7 @@ import {
   View, Text, Image, TouchableOpacity, StyleSheet,
   Modal, Pressable, FlatList,
 } from 'react-native';
-import Slider from 'react-native-slider';
+import Slider from '@react-native-community/slider';
 import { MaterialIcons } from '@expo/vector-icons';
 import { usePlayer, fmtTime } from '../context/PlayerContext';
 
