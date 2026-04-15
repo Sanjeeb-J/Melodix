@@ -1,0 +1,29 @@
+import { StyleSheet, Text, View } from 'react-native';
+
+export default function SearchScreen() {
+  return (
+    <View style={styles.container}>
+      <Text style={styles.title}>Search</Text>
+      <Text style={styles.subtitle}>Discover new music here.</Text>
+    </View>
+  );
+}
+
+const styles = StyleSheet.create({
+  container: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: '#000',
+  },
+  title: {
+    fontSize: 24,
+    fontWeight: 'bold',
+    color: '#fff',
+    marginBottom: 8,
+  },
+  subtitle: {
+    fontSize: 14,
+    color: '#aaa',
+  },
+});
