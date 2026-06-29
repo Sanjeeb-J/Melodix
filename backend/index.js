@@ -15,6 +15,11 @@ const testRoutes = require("./routes/testRoutes");
 const playlistRoutes = require("./routes/playlistRoutes");
 const youtubeRoutes = require("./routes/youtubeRoutes");
 const streamRoutes = require("./routes/streamRoutes");
+const likedRoutes = require("./routes/likedRoutes");
+const historyRoutes = require("./routes/historyRoutes");
+const recommendRoutes = require("./routes/recommendRoutes");
+const searchRoutes = require("./routes/searchRoutes");
+const userRoutes = require("./routes/userRoutes");
 
 const app = express();
 let yt;
@@ -93,6 +98,11 @@ app.use("/api/test", testRoutes);
 app.use("/api/playlists", playlistRoutes);
 app.use("/api/youtube", youtubeRoutes);
 app.use("/api/stream", streamRoutes);
+app.use("/api/liked", likedRoutes);
+app.use("/api/history", historyRoutes);
+app.use("/api/recommendations", recommendRoutes);
+app.use("/api/search", searchRoutes);
+app.use("/api/user", userRoutes);
 
 // Health check
 app.get("/", (req, res) => {

@@ -1,696 +1,337 @@
 import { createContext, useCallback, useContext, useEffect, useRef, useState } from "react";
+import { getStreamUrl } from "../services/streamService";
+import { logPlay } from "../services/historyService";
 
 const PlayerContext = createContext();
-const YOUTUBE_API_SRC = "https://www.youtube.com/iframe_api";
 
-const loadYouTubeApi = () => {
-  if (typeof window === "undefined") {
-    return Promise.reject(new Error("YouTube API is only available in the browser"));
-  }
+const getSongId = (song) => song?.videoId || song?.youtubeId || song?._id || null;
+const clamp = (value, min, max) => Math.min(max, Math.max(min, value));
 
-  if (window.YT?.Player) {
-    return Promise.resolve(window.YT);
-  }
-
-  if (window.__melodixYouTubeApiPromise) {
-    return window.__melodixYouTubeApiPromise;
-  }
-
-  window.__melodixYouTubeApiPromise = new Promise((resolve, reject) => {
-    const existingScript = document.querySelector(`script[src="${YOUTUBE_API_SRC}"]`);
-
-    const handleReady = () => {
-      if (window.YT?.Player) {
-        resolve(window.YT);
-      }
-    };
-
-    const previousReady = window.onYouTubeIframeAPIReady;
-    window.onYouTubeIframeAPIReady = () => {
-      previousReady?.();
-      handleReady();
-    };
-
-    if (!existingScript) {
-      const script = document.createElement("script");
-      script.src = YOUTUBE_API_SRC;
-      script.async = true;
-      script.onerror = () => reject(new Error("Failed to load YouTube IFrame API"));
-      document.head.appendChild(script);
-    } else {
-      existingScript.addEventListener("error", () => reject(new Error("Failed to load YouTube IFrame API")), { once: true });
-    }
-
-    window.setTimeout(() => {
-      if (!window.YT?.Player) {
-        reject(new Error("Timed out while loading YouTube IFrame API"));
-      }
-    }, 15000);
-  });
-
-  return window.__melodixYouTubeApiPromise;
-};
-
-const buildSequentialOrder = (length) => Array.from({ length }, (_, index) => index);
-const getSongId = (song) => song?.youtubeId || song?.videoId || song?._id || null;
-
-const shuffleIndices = (indices) => {
-  const shuffled = [...indices];
-
-  for (let index = shuffled.length - 1; index > 0; index -= 1) {
+const shuffleQueue = (items, currentIndex) => {
+  const rest = items.map((_, index) => index).filter((index) => index !== currentIndex);
+  for (let index = rest.length - 1; index > 0; index -= 1) {
     const swapIndex = Math.floor(Math.random() * (index + 1));
-    [shuffled[index], shuffled[swapIndex]] = [shuffled[swapIndex], shuffled[index]];
+    [rest[index], rest[swapIndex]] = [rest[swapIndex], rest[index]];
   }
-
-  return shuffled;
+  return [currentIndex, ...rest];
 };
 
 export const PlayerProvider = ({ children }) => {
-  const playerRef = useRef(null);
-  const playerHostRef = useRef(null);
-  const progressTimerRef = useRef(null);
-  const pendingVideoIdRef = useRef(null);
-  const repeatModeRef = useRef("none");
+  const audioRef = useRef(null);
+  const playLoggedRef = useRef(false);
   const queueRef = useRef([]);
-  const playbackOrderRef = useRef([]);
-  const playbackIndexRef = useRef(0);
-  const nextSongRef = useRef(null);
-  const volumeRef = useRef(0.7);
-  const isMutedRef = useRef(false);
-  const isPlayingRef = useRef(false);
+  const queueIndexRef = useRef(0);
+  const repeatModeRef = useRef("none");
+  const shuffleOrderRef = useRef([]);
+  const shufflePointerRef = useRef(0);
 
   const [currentSong, setCurrentSong] = useState(null);
-  const [queue, setQueue] = useState([]);
-  const [queueIndex, setQueueIndex] = useState(0);
-  const [playbackOrder, setPlaybackOrder] = useState([]);
-  const [playbackIndex, setPlaybackIndex] = useState(0);
   const [isPlaying, setIsPlaying] = useState(false);
+  const [progress, setProgress] = useState(0);
+  const [currentTime, setCurrentTime] = useState(0);
+  const [duration, setDuration] = useState(0);
+  const [volume, setVolumeState] = useState(() => Number(localStorage.getItem("melodix_volume") || 0.7));
+  const [isMuted, setIsMuted] = useState(false);
   const [isShuffle, setIsShuffle] = useState(false);
   const [repeatMode, setRepeatMode] = useState("none");
-  const [volume, setVolumeState] = useState(() => {
-    const saved = localStorage.getItem("melodix_volume");
-    return saved !== null ? parseFloat(saved) : 0.7;
-  });
-  const [isMuted, setIsMuted] = useState(false);
-  const [progress, setProgress] = useState(0);
-  const [duration, setDuration] = useState(0);
-  const [currentTime, setCurrentTime] = useState(0);
+  const [queue, setQueue] = useState([]);
+  const [queueIndex, setQueueIndex] = useState(0);
   const [isLoading, setIsLoading] = useState(false);
   const [loadingMessage, setLoadingMessage] = useState("");
 
-  const stopProgressTimer = useCallback(() => {
-    if (progressTimerRef.current) {
-      window.clearInterval(progressTimerRef.current);
-      progressTimerRef.current = null;
-    }
-  }, []);
-
-  const syncProgress = useCallback(() => {
-    const player = playerRef.current;
-    if (!player?.getCurrentTime || !player?.getDuration) return;
-
-    const nextCurrentTime = player.getCurrentTime() || 0;
-    const nextDuration = player.getDuration() || 0;
-
-    setCurrentTime(nextCurrentTime);
-    setDuration(nextDuration);
-    setProgress(nextDuration ? nextCurrentTime / nextDuration : 0);
-  }, []);
-
-  const startProgressTimer = useCallback(() => {
-    stopProgressTimer();
-    syncProgress();
-    progressTimerRef.current = window.setInterval(syncProgress, 500);
-  }, [stopProgressTimer, syncProgress]);
-
   const playSong = useCallback((song, newQueue = null, index = 0) => {
-    if (newQueue) {
-      const safeIndex = Math.max(0, Math.min(index, newQueue.length - 1));
-      const sequentialOrder = buildSequentialOrder(newQueue.length);
-      const nextPlaybackOrder = isShuffle
-        ? [safeIndex, ...shuffleIndices(sequentialOrder.filter((item) => item !== safeIndex))]
-        : sequentialOrder;
+    if (!song) return;
 
+    if (newQueue?.length) {
+      const safeIndex = clamp(index, 0, newQueue.length - 1);
+      queueRef.current = newQueue;
+      queueIndexRef.current = safeIndex;
       setQueue(newQueue);
       setQueueIndex(safeIndex);
-      setPlaybackOrder(nextPlaybackOrder);
-      setPlaybackIndex(nextPlaybackOrder.indexOf(safeIndex));
+      if (isShuffle) {
+        shuffleOrderRef.current = shuffleQueue(newQueue, safeIndex);
+        shufflePointerRef.current = 0;
+      }
+    } else if (!queueRef.current.length) {
+      queueRef.current = [song];
+      queueIndexRef.current = 0;
+      setQueue([song]);
+      setQueueIndex(0);
     }
 
+    playLoggedRef.current = false;
     setCurrentSong(song);
-    setIsPlaying(true);
     setIsLoading(true);
     setLoadingMessage("Loading song...");
   }, [isShuffle]);
 
   const playNow = useCallback((song) => {
-    if (!song) return;
-
-    const currentQueue = queueRef.current;
-    const currentOrder = playbackOrderRef.current;
-    const currentPlaybackIndex = playbackIndexRef.current;
     const songId = getSongId(song);
-
-    if (!currentQueue.length || !currentOrder.length || !songId) {
-      playSong(song);
-      return;
+    const existingIndex = queueRef.current.findIndex((item) => getSongId(item) === songId);
+    if (existingIndex >= 0) {
+      queueIndexRef.current = existingIndex;
+      setQueueIndex(existingIndex);
     }
-
-    const existingQueueIndex = currentQueue.findIndex(
-      (item) => getSongId(item) === songId
-    );
-
-    if (existingQueueIndex === -1) {
-      setCurrentSong(song);
-      setIsPlaying(true);
-      setIsLoading(true);
-      setLoadingMessage("Loading song...");
-      return;
-    }
-
-    const existingPlaybackIndex = currentOrder.indexOf(existingQueueIndex);
-
-    if (existingPlaybackIndex === -1) {
-      playSong(song, currentQueue, existingQueueIndex);
-      return;
-    }
-
-    setQueueIndex(existingQueueIndex);
-    setPlaybackIndex(existingPlaybackIndex);
-    setCurrentSong(currentQueue[existingQueueIndex]);
-    setIsPlaying(true);
-    setIsLoading(true);
-    setLoadingMessage("Loading song...");
+    playSong(song);
   }, [playSong]);
 
-  const playQueueItem = useCallback((playbackOrderIndex) => {
-    const currentQueue = queueRef.current;
-    const currentOrder = playbackOrderRef.current;
+  const playQueue = useCallback((songs, startIndex = 0) => {
+    if (!songs?.length) return;
+    const safeIndex = clamp(startIndex, 0, songs.length - 1);
+    playSong(songs[safeIndex], songs, safeIndex);
+  }, [playSong]);
 
-    if (
-      !currentQueue.length ||
-      !currentOrder.length ||
-      playbackOrderIndex < 0 ||
-      playbackOrderIndex >= currentOrder.length
-    ) {
-      return;
-    }
-
-    const nextQueueIndex = currentOrder[playbackOrderIndex];
-    const nextSong = currentQueue[nextQueueIndex];
-
-    if (!nextSong) return;
-
-    setQueueIndex(nextQueueIndex);
-    setPlaybackIndex(playbackOrderIndex);
-    setCurrentSong(nextSong);
-    setIsPlaying(true);
-    setIsLoading(true);
-    setLoadingMessage("Loading song...");
-  }, []);
-
-  const togglePlay = useCallback(() => {
-    const player = playerRef.current;
-    if (!player || !currentSong || !window.YT?.PlayerState) return;
-
-    const state = player.getPlayerState?.();
-    if (state === window.YT.PlayerState.PLAYING) {
-      player.pauseVideo();
-    } else {
-      setIsLoading(true);
-      setLoadingMessage("Loading song...");
-      player.playVideo();
-    }
-  }, [currentSong]);
+  const playQueueItem = useCallback((index) => {
+    const song = queueRef.current[index];
+    if (!song) return;
+    queueIndexRef.current = index;
+    setQueueIndex(index);
+    playSong(song);
+  }, [playSong]);
 
   const nextSong = useCallback(() => {
-    if (!queue.length || !playbackOrder.length) return;
+    const items = queueRef.current;
+    if (!items.length) return;
 
-    const isLastSong = playbackIndex >= playbackOrder.length - 1;
-    if (isLastSong) {
-      if (repeatModeRef.current === "all") {
-        const firstQueueIndex = playbackOrder[0];
-        setPlaybackIndex(0);
-        setQueueIndex(firstQueueIndex);
-        setCurrentSong(queue[firstQueueIndex]);
-        setIsPlaying(true);
-        setIsLoading(true);
-        setLoadingMessage("Loading song...");
-      } else {
-        setIsPlaying(false);
-      }
-      return;
+    let nextIndex = queueIndexRef.current + 1;
+    if (isShuffle && shuffleOrderRef.current.length) {
+      shufflePointerRef.current += 1;
+      nextIndex = shuffleOrderRef.current[shufflePointerRef.current];
     }
 
-    const nextPlaybackIndex = playbackIndex + 1;
-    const nextQueueIndex = playbackOrder[nextPlaybackIndex];
+    if (nextIndex === undefined || nextIndex >= items.length) {
+      if (repeatModeRef.current !== "all") {
+        audioRef.current?.pause();
+        setIsPlaying(false);
+        return;
+      }
+      nextIndex = 0;
+      shufflePointerRef.current = 0;
+    }
 
-    setPlaybackIndex(nextPlaybackIndex);
-    setQueueIndex(nextQueueIndex);
-    setCurrentSong(queue[nextQueueIndex]);
-    setIsPlaying(true);
-    setIsLoading(true);
-    setLoadingMessage("Loading song...");
-  }, [playbackIndex, playbackOrder, queue]);
+    queueIndexRef.current = nextIndex;
+    setQueueIndex(nextIndex);
+    playSong(items[nextIndex]);
+  }, [isShuffle, playSong]);
 
   const prevSong = useCallback(() => {
-    const player = playerRef.current;
-    if (!queue.length || !playbackOrder.length) return;
-
-    if (currentTime > 3 && player?.seekTo) {
-      player.seekTo(0, true);
+    const audio = audioRef.current;
+    if (audio && audio.currentTime > 3) {
+      audio.currentTime = 0;
       return;
     }
 
-    const prevPlaybackIndex =
-      playbackIndex > 0 ? playbackIndex - 1 : playbackOrder.length - 1;
-    const prevQueueIndex = playbackOrder[prevPlaybackIndex];
+    const items = queueRef.current;
+    if (!items.length) return;
+    const prevIndex = clamp(queueIndexRef.current - 1, 0, items.length - 1);
+    queueIndexRef.current = prevIndex;
+    setQueueIndex(prevIndex);
+    playSong(items[prevIndex]);
+  }, [playSong]);
 
-    setPlaybackIndex(prevPlaybackIndex);
-    setQueueIndex(prevQueueIndex);
-    setCurrentSong(queue[prevQueueIndex]);
-    setIsPlaying(true);
-    setIsLoading(true);
-    setLoadingMessage("Loading song...");
-  }, [queue, playbackOrder, playbackIndex, currentTime]);
+  const togglePlay = useCallback(() => {
+    const audio = audioRef.current;
+    if (!audio || !currentSong) return;
+    if (audio.paused) audio.play().catch(() => setIsPlaying(false));
+    else audio.pause();
+  }, [currentSong]);
 
-  const seek = useCallback((fraction) => {
-    const player = playerRef.current;
-    if (!player?.seekTo || !duration) return;
+  const pause = useCallback(() => audioRef.current?.pause(), []);
+  const resume = useCallback(() => audioRef.current?.play?.(), []);
 
-    const nextTime = fraction * duration;
-    player.seekTo(nextTime, true);
-    setCurrentTime(nextTime);
-    setProgress(fraction);
+  const seek = useCallback((fractionOrSeconds) => {
+    const audio = audioRef.current;
+    if (!audio || !duration) return;
+    const nextTime = fractionOrSeconds <= 1 ? fractionOrSeconds * duration : fractionOrSeconds;
+    audio.currentTime = clamp(nextTime, 0, duration);
   }, [duration]);
 
-  const setVolume = useCallback((val) => {
-    const player = playerRef.current;
-    setVolumeState(val);
-    localStorage.setItem("melodix_volume", val);
-
-    if (player?.setVolume) {
-      player.setVolume(Math.round(val * 100));
-    }
-
-    if (val <= 0) {
-      player?.mute?.();
-      setIsMuted(true);
-      return;
-    }
-
-    player?.unMute?.();
-    setIsMuted(false);
+  const setVolume = useCallback((value) => {
+    const nextVolume = clamp(value, 0, 1);
+    setVolumeState(nextVolume);
+    localStorage.setItem("melodix_volume", String(nextVolume));
+    if (audioRef.current) audioRef.current.volume = nextVolume;
+    if (nextVolume > 0) setIsMuted(false);
   }, []);
 
   const toggleMute = useCallback(() => {
-    const player = playerRef.current;
-    if (!player?.isMuted) return;
-
-    const nextMuted = !player.isMuted();
-    if (nextMuted) {
-      player.mute();
-    } else {
-      player.unMute();
-      if (volume > 0) {
-        player.setVolume(Math.round(volume * 100));
-      }
-    }
-    setIsMuted(nextMuted);
-  }, [volume]);
+    setIsMuted((value) => {
+      const next = !value;
+      if (audioRef.current) audioRef.current.muted = next;
+      return next;
+    });
+  }, []);
 
   const toggleShuffle = useCallback(() => {
-    if (!queue.length) {
-      setIsShuffle((value) => !value);
-      return;
-    }
-
-    setIsShuffle((currentValue) => {
-      const nextValue = !currentValue;
-      const currentQueueIndex = queue.findIndex(
-        (song) =>
-          (song.youtubeId || song.videoId) === (currentSong?.youtubeId || currentSong?.videoId)
-      );
-      const safeQueueIndex = currentQueueIndex >= 0 ? currentQueueIndex : queueIndex;
-      const sequentialOrder = buildSequentialOrder(queue.length);
-      const nextOrder = nextValue
-        ? [safeQueueIndex, ...shuffleIndices(sequentialOrder.filter((item) => item !== safeQueueIndex))]
-        : sequentialOrder;
-
-      setPlaybackOrder(nextOrder);
-      setPlaybackIndex(nextOrder.indexOf(safeQueueIndex));
-      setQueueIndex(safeQueueIndex);
-
-      return nextValue;
+    setIsShuffle((value) => {
+      const next = !value;
+      if (next) {
+        shuffleOrderRef.current = shuffleQueue(queueRef.current, queueIndexRef.current);
+        shufflePointerRef.current = 0;
+      } else {
+        shuffleOrderRef.current = [];
+      }
+      return next;
     });
-  }, [queue, currentSong, queueIndex]);
-  const toggleRepeat = () =>
-    setRepeatMode((mode) => (mode === "none" ? "all" : mode === "all" ? "one" : "none"));
+  }, []);
+
+  const toggleRepeat = useCallback(() => {
+    setRepeatMode((mode) => {
+      const next = mode === "none" ? "all" : mode === "all" ? "one" : "none";
+      repeatModeRef.current = next;
+      return next;
+    });
+  }, []);
+
+  const addToQueue = useCallback((song) => {
+    queueRef.current = [...queueRef.current, song];
+    setQueue(queueRef.current);
+  }, []);
+
+  const removeFromQueue = useCallback((index) => {
+    queueRef.current = queueRef.current.filter((_, itemIndex) => itemIndex !== index);
+    queueIndexRef.current = clamp(queueIndexRef.current, 0, Math.max(queueRef.current.length - 1, 0));
+    setQueue(queueRef.current);
+    setQueueIndex(queueIndexRef.current);
+  }, []);
 
   useEffect(() => {
     repeatModeRef.current = repeatMode;
   }, [repeatMode]);
 
   useEffect(() => {
-    queueRef.current = queue;
-  }, [queue]);
+    const audio = audioRef.current;
+    if (!audio || !currentSong) return;
 
-  useEffect(() => {
-    playbackOrderRef.current = playbackOrder;
-  }, [playbackOrder]);
-
-  useEffect(() => {
-    playbackIndexRef.current = playbackIndex;
-  }, [playbackIndex]);
-
-  useEffect(() => {
-    nextSongRef.current = nextSong;
-  }, [nextSong]);
-
-  const upcomingQueue = playbackOrder
-    .slice(playbackIndex + 1)
-    .map((itemIndex, offset) => {
-      const song = queue[itemIndex];
-      if (!song) return null;
-
-      return {
-        song,
-        queueIndex: itemIndex,
-        playbackOrderIndex: playbackIndex + offset + 1,
-      };
-    })
-    .filter(Boolean);
-
-  useEffect(() => {
-    volumeRef.current = volume;
-  }, [volume]);
-
-  useEffect(() => {
-    isMutedRef.current = isMuted;
-  }, [isMuted]);
-
-  useEffect(() => {
-    isPlayingRef.current = isPlaying;
-  }, [isPlaying]);
-
-  useEffect(() => {
-    const handleKeyDown = (e) => {
-      if (["INPUT", "TEXTAREA", "SELECT"].includes(document.activeElement.tagName)) return;
-
-      switch (e.code) {
-        case "Space":
-          e.preventDefault();
-          togglePlay();
-          break;
-        case "ArrowRight":
-          if (e.shiftKey) {
-            nextSong();
-          } else if (playerRef.current?.seekTo) {
-            const nextTime = Math.min(duration, currentTime + 10);
-            playerRef.current.seekTo(nextTime, true);
-          }
-          break;
-        case "ArrowLeft":
-          if (e.shiftKey) {
-            prevSong();
-          } else if (playerRef.current?.seekTo) {
-            const nextTime = Math.max(0, currentTime - 10);
-            playerRef.current.seekTo(nextTime, true);
-          }
-          break;
-        case "KeyL":
-          toggleRepeat();
-          break;
-        case "KeyS":
-          toggleShuffle();
-          break;
-        case "KeyM":
-          toggleMute();
-          break;
-        default:
-          break;
-      }
-    };
-
-    window.addEventListener("keydown", handleKeyDown);
-    return () => window.removeEventListener("keydown", handleKeyDown);
-  }, [currentTime, duration, nextSong, prevSong, toggleMute, togglePlay]);
-
-  useEffect(() => {
-    let cancelled = false;
-
-    loadYouTubeApi()
-      .then((YT) => {
-        if (cancelled || playerRef.current || !playerHostRef.current) return;
-
-        playerRef.current = new YT.Player(playerHostRef.current, {
-          height: "0",
-          width: "0",
-          playerVars: {
-            autoplay: 0,
-            controls: 0,
-            disablekb: 1,
-            fs: 0,
-            modestbranding: 1,
-            playsinline: 1,
-            rel: 0,
-            origin: window.location.origin,
-          },
-          events: {
-            onReady: (event) => {
-              event.target.setVolume(Math.round(volumeRef.current * 100));
-              if (isMutedRef.current || volumeRef.current <= 0) {
-                event.target.mute();
-              }
-
-              if (pendingVideoIdRef.current) {
-                event.target.cueVideoById(pendingVideoIdRef.current);
-                if (isPlayingRef.current) {
-                  event.target.playVideo();
-                }
-              }
-            },
-            onStateChange: (event) => {
-              switch (event.data) {
-                case YT.PlayerState.BUFFERING:
-                  setIsLoading(true);
-                  setLoadingMessage("Buffering...");
-                  break;
-                case YT.PlayerState.PLAYING:
-                  setIsPlaying(true);
-                  setIsLoading(false);
-                  setLoadingMessage("");
-                  startProgressTimer();
-                  break;
-                case YT.PlayerState.PAUSED:
-                  setIsPlaying(false);
-                  setIsLoading(false);
-                  setLoadingMessage("");
-                  stopProgressTimer();
-                  syncProgress();
-                  break;
-                case YT.PlayerState.ENDED:
-                  stopProgressTimer();
-                  setCurrentTime(event.target.getDuration?.() || 0);
-                  setProgress(1);
-                  if (repeatModeRef.current === "one") {
-                    event.target.seekTo(0, true);
-                    event.target.playVideo();
-                  } else if (
-                    repeatModeRef.current === "all" ||
-                    playbackIndexRef.current < playbackOrderRef.current.length - 1
-                  ) {
-                    nextSongRef.current?.();
-                  } else {
-                    setIsPlaying(false);
-                  }
-                  break;
-                case YT.PlayerState.CUED:
-                  setIsLoading(false);
-                  setLoadingMessage("");
-                  syncProgress();
-                  if (isPlayingRef.current) {
-                    event.target.playVideo();
-                  }
-                  break;
-                default:
-                  break;
-              }
-            },
-            onError: () => {
-              stopProgressTimer();
-              setIsLoading(false);
-              setLoadingMessage("");
-              setIsPlaying(false);
-              console.error("[Player] YouTube playback error");
-              if (playbackIndexRef.current < playbackOrderRef.current.length - 1) {
-                window.setTimeout(() => nextSongRef.current?.(), 250);
-              }
-            },
-          },
-        });
-      })
-      .catch((error) => {
-        console.error("[Player] Failed to initialize YouTube player:", error.message);
-        setIsLoading(false);
-        setLoadingMessage("");
-      });
-
-    return () => {
-      cancelled = true;
-      stopProgressTimer();
-      playerRef.current?.destroy?.();
-      playerRef.current = null;
-    };
-  }, [startProgressTimer, stopProgressTimer, syncProgress]);
-
-  useEffect(() => {
-    const player = playerRef.current;
-    const videoId = currentSong?.videoId || currentSong?.youtubeId;
-
-    if (!videoId) {
-      pendingVideoIdRef.current = null;
-      stopProgressTimer();
+    audio.src = getStreamUrl(getSongId(currentSong));
+    audio.load();
+    setIsLoading(true);
+    setLoadingMessage("Loading song...");
+    audio.play().catch(() => {
       setIsPlaying(false);
       setIsLoading(false);
       setLoadingMessage("");
-      setCurrentTime(0);
-      setDuration(0);
-      setProgress(0);
-      player?.stopVideo?.();
-      return;
-    }
-
-    pendingVideoIdRef.current = videoId;
-    setIsLoading(true);
-    setLoadingMessage("Loading song...");
-    setCurrentTime(0);
-    setDuration(0);
-    setProgress(0);
-
-    if (!player?.loadVideoById) return;
-
-    player.loadVideoById(videoId);
-  }, [currentSong, stopProgressTimer]);
+    });
+  }, [currentSong]);
 
   useEffect(() => {
-    const player = playerRef.current;
-    if (!player) return;
-
-    if (volume <= 0 || isMuted) {
-      player.mute?.();
-      return;
-    }
-
-    player.unMute?.();
-    player.setVolume?.(Math.round(volume * 100));
+    const audio = audioRef.current;
+    if (!audio) return;
+    audio.volume = volume;
+    audio.muted = isMuted;
   }, [volume, isMuted]);
 
   useEffect(() => {
-    if (!("mediaSession" in navigator)) return;
+    const audio = audioRef.current;
+    if (!audio) return undefined;
 
-    if (!currentSong) {
-      navigator.mediaSession.metadata = null;
-      return;
-    }
+    const sync = () => {
+      const nextDuration = Number.isFinite(audio.duration) ? audio.duration : 0;
+      setCurrentTime(audio.currentTime || 0);
+      setDuration(nextDuration);
+      setProgress(nextDuration ? audio.currentTime / nextDuration : 0);
 
-    navigator.mediaSession.metadata = new MediaMetadata({
-      title: currentSong.name || currentSong.title || "Melodix",
-      artist: currentSong.artist || "Unknown artist",
-      album: currentSong.album || "Melodix",
-      artwork: currentSong.thumbnail
-        ? [
-            { src: currentSong.thumbnail, sizes: "96x96", type: "image/png" },
-            { src: currentSong.thumbnail, sizes: "128x128", type: "image/png" },
-            { src: currentSong.thumbnail, sizes: "192x192", type: "image/png" },
-            { src: currentSong.thumbnail, sizes: "256x256", type: "image/png" },
-            { src: currentSong.thumbnail, sizes: "512x512", type: "image/png" },
-          ]
-        : [],
-    });
-
-    navigator.mediaSession.setActionHandler("play", () => {
-      playerRef.current?.playVideo?.();
-    });
-    navigator.mediaSession.setActionHandler("pause", () => {
-      playerRef.current?.pauseVideo?.();
-    });
-    navigator.mediaSession.setActionHandler("previoustrack", () => {
-      prevSong();
-    });
-    navigator.mediaSession.setActionHandler("nexttrack", () => {
-      nextSong();
-    });
-    navigator.mediaSession.setActionHandler("seekbackward", () => {
-      const player = playerRef.current;
-      if (!player?.seekTo) return;
-      player.seekTo(Math.max(0, currentTime - 10), true);
-    });
-    navigator.mediaSession.setActionHandler("seekforward", () => {
-      const player = playerRef.current;
-      if (!player?.seekTo) return;
-      player.seekTo(Math.min(duration, currentTime + 10), true);
-    });
-  }, [currentSong, currentTime, duration, nextSong, prevSong]);
-
-  useEffect(() => {
-    if (!("mediaSession" in navigator)) return;
-
-    navigator.mediaSession.playbackState = isPlaying ? "playing" : "paused";
-
-    if ("setPositionState" in navigator.mediaSession && duration > 0) {
-      try {
-        navigator.mediaSession.setPositionState({
-          duration,
-          playbackRate: 1,
-          position: Math.min(currentTime, duration),
-        });
-      } catch {
-        // Ignore platforms that reject position updates for iframe-backed playback.
+      if (!playLoggedRef.current && audio.currentTime >= 10 && currentSong) {
+        playLoggedRef.current = true;
+        logPlay({
+          ...currentSong,
+          videoId: getSongId(currentSong),
+          title: currentSong.title || currentSong.name,
+          duration: Math.round(nextDuration),
+        }).catch(() => {});
       }
-    }
-  }, [isPlaying, currentTime, duration]);
+    };
+
+    const onPlaying = () => {
+      setIsPlaying(true);
+      setIsLoading(false);
+      setLoadingMessage("");
+    };
+    const onPause = () => setIsPlaying(false);
+    const onWaiting = () => {
+      setIsLoading(true);
+      setLoadingMessage("Buffering...");
+    };
+    const onEnded = () => {
+      if (repeatModeRef.current === "one") {
+        audio.currentTime = 0;
+        audio.play().catch(() => setIsPlaying(false));
+        return;
+      }
+      nextSong();
+    };
+    const onError = () => {
+      setIsPlaying(false);
+      setIsLoading(false);
+      setLoadingMessage("");
+    };
+
+    audio.addEventListener("timeupdate", sync);
+    audio.addEventListener("loadedmetadata", sync);
+    audio.addEventListener("playing", onPlaying);
+    audio.addEventListener("pause", onPause);
+    audio.addEventListener("waiting", onWaiting);
+    audio.addEventListener("ended", onEnded);
+    audio.addEventListener("error", onError);
+
+    return () => {
+      audio.removeEventListener("timeupdate", sync);
+      audio.removeEventListener("loadedmetadata", sync);
+      audio.removeEventListener("playing", onPlaying);
+      audio.removeEventListener("pause", onPause);
+      audio.removeEventListener("waiting", onWaiting);
+      audio.removeEventListener("ended", onEnded);
+      audio.removeEventListener("error", onError);
+    };
+  }, [currentSong, nextSong]);
+
+  const upcomingQueue = queue.slice(queueIndex + 1).map((song, offset) => ({
+    song,
+    queueIndex: queueIndex + offset + 1,
+    playbackOrderIndex: queueIndex + offset + 1,
+  }));
 
   return (
     <PlayerContext.Provider
       value={{
         currentSong,
         isPlaying,
-        isShuffle,
-        repeatMode,
+        progress,
+        currentTime,
+        duration,
         volume,
         isMuted,
-        progress,
-        duration,
-        currentTime,
+        isShuffle,
+        isShuffled: isShuffle,
+        repeatMode,
+        queue,
+        queueIndex,
+        upcomingQueue,
         isLoading,
         loadingMessage,
-        queue,
-        upcomingQueue,
+        play: playSong,
         playSong,
         playNow,
+        playQueue,
         playQueueItem,
+        pause,
+        resume,
         togglePlay,
+        next: nextSong,
         nextSong,
+        prev: prevSong,
         prevSong,
         seek,
         setVolume,
         toggleMute,
         toggleShuffle,
+        cycleRepeat: toggleRepeat,
         toggleRepeat,
+        addToQueue,
+        removeFromQueue,
       }}
     >
-      <div
-        ref={playerHostRef}
-        aria-hidden="true"
-        style={{
-          position: "absolute",
-          width: 0,
-          height: 0,
-          overflow: "hidden",
-          pointerEvents: "none",
-        }}
-      />
+      <audio ref={audioRef} preload="metadata" />
       {children}
     </PlayerContext.Provider>
   );

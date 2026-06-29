@@ -64,13 +64,15 @@ const invalidatePlaylistCache = () => {
 
 // ─── API functions ────────────────────────────────────────────────────────────
 
-export const getPlaylists = async () => {
+export const getPlaylists = async ({ forceRefresh = false } = {}) => {
   const token = localStorage.getItem("token");
 
   // ✅ Serve from cache if fresh
-  const cached = getCachedPlaylists(token);
-  if (cached) {
-    return cached;
+  if (!forceRefresh) {
+    const cached = getCachedPlaylists(token);
+    if (cached) {
+      return cached;
+    }
   }
 
   let res;

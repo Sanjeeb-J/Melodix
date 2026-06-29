@@ -2,7 +2,7 @@ const rawApiBaseUrl = import.meta.env.VITE_API_URL?.trim();
 
 export const API_BASE_URL = rawApiBaseUrl
   ? rawApiBaseUrl.replace(/\/+$/, "")
-  : "";
+  : "https://melodix-backend.onrender.com";
 
 const buildApiError = (message, status = 0, details = null) => {
   const error = new Error(message);
@@ -12,13 +12,6 @@ const buildApiError = (message, status = 0, details = null) => {
 };
 
 export const getApiUrl = (path = "") => {
-  if (!API_BASE_URL) {
-    throw buildApiError(
-      "App configuration error: VITE_API_URL is missing.",
-      0
-    );
-  }
-
   const normalizedPath = path.startsWith("/") ? path : `/${path}`;
   return `${API_BASE_URL}${normalizedPath}`;
 };

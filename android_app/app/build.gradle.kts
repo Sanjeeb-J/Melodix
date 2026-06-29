@@ -18,6 +18,16 @@ android {
 
     buildFeatures {
         compose = true
+        buildConfig = true
+    }
+
+    buildTypes {
+        debug {
+            buildConfigField("String", "BACKEND_URL", "\"https://melodix-backend.onrender.com\"")
+        }
+        release {
+            buildConfigField("String", "BACKEND_URL", "\"https://melodix-backend.onrender.com\"")
+        }
     }
 
     compileOptions {

@@ -17,6 +17,16 @@ const userSchema = new mongoose.Schema(
       type: String,
       required: true,
     },
+    displayName: {
+      type: String,
+      trim: true,
+      default: "",
+    },
+    avatarColor: {
+      type: String,
+      trim: true,
+      default: "#1DB954",
+    },
   },
   {
     timestamps: true,
